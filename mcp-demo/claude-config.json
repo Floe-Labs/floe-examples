@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "floe": {
+      "url": "https://mcp.floelabs.xyz/mcp",
+      "transport": "streamable-http"
+    }
+  }
+}

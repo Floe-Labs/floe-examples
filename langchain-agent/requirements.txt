@@ -1,0 +1,5 @@
+floe-agentkit-actions>=0.2.0
+coinbase-agentkit>=0.7.0
+coinbase-agentkit-langchain>=0.1.0
+langchain-openai>=0.1.0
+python-dotenv>=1.0.0
