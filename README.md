@@ -1,27 +1,67 @@
 # Floe Examples
 
-Working capital for AI agents — example integrations for the [Floe](https://dev-dashboard.floelabs.xyz) credit protocol on Base.
+**The Financial OS for AI Agents — runnable examples.**
 
-**3,000+ secured working capital lines issued. Zero defaults.** Deposit USDC, borrow up to 95%, spend it on APIs, compute, or anything your agent needs. Gas-free. Fund with fiat.
+Wallet, fiat on/off-ramp, working capital, x402 payments, and portable credit. One SDK. Examples here span TypeScript and Python and cover every GA component of the Floe stack.
+
+> **Proof points:** 3,000+ secured working capital lines issued · zero defaults · 13,000+ x402 APIs reachable via the Floe proxy.
 
 Each example is self-contained — clone, configure, run in under 5 minutes.
 
+---
+
 ## Examples
 
-| Example | Language | What it does |
-|---|---|---|
-| [yield-optimizer](./yield-optimizer/) | TypeScript | Deposits USDC, borrows working capital, deploys to yield strategy, repays on maturity |
-| [flash-arb-bot](./flash-arb-bot/) | TypeScript | Monitors price diffs, executes flash arb via Aerodrome |
-| [x402-client](./x402-client/) | TypeScript | Delegates credit to Floe facilitator, calls x402 APIs gas-free |
-| [mcp-demo](./mcp-demo/) | Config only | Connect Claude Desktop to Floe in one line |
-| [langchain-agent](./langchain-agent/) | Python | LangChain agent with Floe working capital tools |
-| [crewai-demo](./crewai-demo/) | Python | CrewAI crew with DeFi lending capabilities |
+| Example | Language | Frameworks | Components covered | Status |
+|---|---|---|---|---|
+| [**financial-os-loop**](./financial-os-loop/) | TypeScript + Python | AgentKit | Wallet · Onramp · Secured credit · x402 · Repay · Credit thresholds | `New` — canonical end-to-end |
+| [agentkit-ts-chatbot](./agentkit-ts-chatbot/) | TypeScript | AgentKit + Vercel AI SDK | Wallet · Secured credit · x402 | `New` |
+| [yield-optimizer](./yield-optimizer/) | TypeScript | AgentKit | Wallet · Secured credit | |
+| [flash-arb-bot](./flash-arb-bot/) | TypeScript | AgentKit | Secured credit (flash loan path) | |
+| [x402-client](./x402-client/) | TypeScript | AgentKit | x402 payment facilitator | |
+| [mcp-demo](./mcp-demo/) | Config only | Claude Desktop / Cursor (via MCP) | Wallet · Secured credit | |
+| [langchain-agent](./langchain-agent/) | Python | LangChain | Wallet · Secured credit · x402 | |
+| [crewai-demo](./crewai-demo/) | Python | CrewAI (via MCP) | Wallet · Secured credit | |
+| [openai-agents](./openai-agents/) | TypeScript | OpenAI Agents SDK | Wallet · Secured credit · x402 | `Preview` — MCP fallback |
+
+---
+
+## Where do I start?
+
+| If you... | Start with |
+|---|---|
+| Just want to see the full Floe loop end-to-end | [`financial-os-loop/`](./financial-os-loop/) |
+| Are using Coinbase AgentKit (TypeScript) | [`agentkit-ts-chatbot/`](./agentkit-ts-chatbot/) |
+| Are using LangChain (Python) | [`langchain-agent/`](./langchain-agent/) |
+| Are using Claude Desktop, Claude Code, Cursor | [`mcp-demo/`](./mcp-demo/) |
+| Are using CrewAI | [`crewai-demo/`](./crewai-demo/) |
+| Want to call x402 APIs from your own framework | [`x402-client/`](./x402-client/) |
+| Are building a yield/treasury agent | [`yield-optimizer/`](./yield-optimizer/) |
+| Are arbitraging on-chain markets | [`flash-arb-bot/`](./flash-arb-bot/) |
+
+---
+
+## The Floe Stack covered here
+
+| # | Component | Status | Example coverage |
+|---|---|---|---|
+| 01 | Agent Wallet | `GA` | All examples |
+| 02 | Fiat on-ramp | `GA` (dashboard-driven) | `financial-os-loop` shows the deep link |
+| 03 | Secured working capital | `GA` | `financial-os-loop`, `yield-optimizer`, `langchain-agent`, `crewai-demo` |
+| 04 | Unsecured working capital | `Preview` | [Join the waitlist](https://floelabs.xyz/unsecured) |
+| 05 | x402 payment facilitator | `GA` | `financial-os-loop`, `x402-client`, `langchain-agent` |
+| 06 | Credit & trust bureau | Reader `Beta` · Writer `Preview` | `financial-os-loop` registers a credit threshold |
+
+---
 
 ## Prerequisites
 
 - Node.js 18+ (TypeScript examples) or Python 3.10+ (Python examples)
-- USDC on Base (or buy from the [dashboard](https://dev-dashboard.floelabs.xyz) with a credit card)
 - An RPC endpoint (Base mainnet)
+- A Floe API key — get one at [dev-dashboard.floelabs.xyz](https://dev-dashboard.floelabs.xyz)
+- USDC on Base (or fund with fiat from the dashboard)
+
+---
 
 ## Quick start
 
@@ -30,45 +70,55 @@ Each example is self-contained — clone, configure, run in under 5 minutes.
 git clone https://github.com/Floe-Labs/floe-examples.git
 cd floe-examples
 
-# Pick an example
-cd yield-optimizer
+# Pick an example (the canonical one is financial-os-loop)
+cd financial-os-loop
 cp .env.example .env
-# Edit .env with your wallet key and RPC URL
+# Edit .env with your wallet key, RPC URL, and FLOE_API_KEY
 
-npm install
-npx tsx index.ts
+# TypeScript
+npm install && npx tsx index.ts
+
+# Python (in the same example folder)
+pip install -r requirements.txt && python main.py
 ```
 
 ### Don't have USDC?
 
-Fund your agent wallet with fiat directly from the [Floe dashboard](https://dev-dashboard.floelabs.xyz) — credit card or bank transfer via Coinbase.
+Fund your agent wallet with fiat directly from the [Floe dashboard](https://dev-dashboard.floelabs.xyz) — credit card, bank transfer, Apple Pay, or Google Pay via Coinbase.
 
-## How it works
+---
+
+## How it works — the full financial loop
 
 ```
-Agent deposits $10,000 USDC
-  → Borrows $9,500 USDC (95% LTV)
-  → Spends on API calls, compute, services
-  → Repays $9,500 + fixed interest fee
-  → Gets $10,000 deposit back
+1. Setup    register agent + wallet (ERC-8004 identity, spend limits)
+2. Fund     USDC in via cards, bank, Apple/Google Pay, or on-chain
+3. Borrow   one API call to instant_borrow — fixed rate, fixed term
+4. Spend    x402_fetch any of 13,000+ APIs through the Floe proxy
+5. Repay    repay_loan — collateral auto-returns in the same tx
+6. Trust    every repayment writes to your agent's on-chain credit record
 ```
 
-No price-volatility risk. No crypto complexity. Same token in, same token out.
+No price-volatility risk on the primary market. No crypto complexity for the agent operator. Same-token deposits and borrows.
+
+---
 
 ## Packages
 
-| Package | Install | Actions |
+| Package | Install | Actions / Tools |
 |---|---|---|
-| [`floe-agent`](https://www.npmjs.com/package/floe-agent) | `npm install floe-agent` | 45 (TypeScript) |
-| [`floe-agentkit-actions`](https://pypi.org/project/floe-agentkit-actions/) | `pip install floe-agentkit-actions` | 45 (Python) |
+| [`floe-agent`](https://www.npmjs.com/package/floe-agent) | `npm install floe-agent` | 45 actions (TypeScript) |
+| [`floe-agentkit-actions`](https://pypi.org/project/floe-agentkit-actions/) | `pip install floe-agentkit-actions` | 45 actions (Python) |
 | [`@floelabs/mcp-server`](https://github.com/Floe-Labs/floe-mcp-server) | Zero install — hosted | 36 tools (MCP) |
+
+---
 
 ## Links
 
+- [Website](https://floelabs.xyz)
 - [Dashboard](https://dev-dashboard.floelabs.xyz)
 - [Docs](https://floe-labs.gitbook.io/docs)
-- [Agent Quick Start](https://floe-labs.gitbook.io/docs/agents/quickstart-agents)
-- [Website](https://floelabs.xyz)
+- [Quickstart](https://floe-labs.gitbook.io/docs/getting-started/quickstart)
 
 ## License
 
