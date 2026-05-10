@@ -1,0 +1,23 @@
+{
+  "name": "agentkit-ts-chatbot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Conversational Floe agent using AgentKit + Vercel AI SDK.",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/openai": "^1.0.0",
+    "@coinbase/agentkit": "^0.2.0",
+    "@coinbase/agentkit-vercel-ai-sdk": "^0.2.0",
+    "ai": "^4.0.0",
+    "dotenv": "^16.4.5",
+    "floe-agent": "^0.3.0",
+    "viem": "^2.21.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0"
+  }
+}

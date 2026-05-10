@@ -1,0 +1,3 @@
+floe-agentkit-actions>=0.3.0
+coinbase-agentkit>=0.7.0
+python-dotenv>=1.2.2
