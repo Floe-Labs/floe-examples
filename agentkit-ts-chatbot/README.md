@@ -21,7 +21,7 @@ npx tsx index.ts
 
 ## Example session
 
-```
+```text
 You: What credit do I have available?
 Agent: (calls get_credit_remaining) You have 4,500 USDC available, 10% utilized.
 

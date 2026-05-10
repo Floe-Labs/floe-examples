@@ -10,10 +10,25 @@ import { createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { base } from "viem/chains";
 
-const { PRIVATE_KEY, BASE_RPC_URL, FLOE_API_KEY } = process.env;
+const REQUIRED_ENV = ["PRIVATE_KEY", "BASE_RPC_URL", "FLOE_API_KEY", "OPENAI_API_KEY"] as const;
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missing.length) {
+  console.error(
+    `Missing required env: ${missing.join(", ")}. Copy .env.example to .env and fill it in.`,
+  );
+  process.exit(1);
+}
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY as `0x${string}`;
+if (!/^0x[0-9a-fA-F]{64}$/.test(PRIVATE_KEY)) {
+  console.error("PRIVATE_KEY must be a 0x-prefixed 32-byte hex string.");
+  process.exit(1);
+}
+const BASE_RPC_URL = process.env.BASE_RPC_URL as string;
+const FLOE_API_KEY = process.env.FLOE_API_KEY as string;
 
 async function main() {
-  const account = privateKeyToAccount(PRIVATE_KEY as `0x${string}`);
+  const account = privateKeyToAccount(PRIVATE_KEY);
   const walletClient = createWalletClient({ account, chain: base, transport: http(BASE_RPC_URL) });
   const walletProvider = new ViemWalletProvider(walletClient);
 

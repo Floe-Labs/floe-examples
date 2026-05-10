@@ -47,9 +47,9 @@ Each example is self-contained — clone, configure, run in under 5 minutes.
 |---|---|---|---|
 | 01 | Agent Wallet | `GA` | All examples |
 | 02 | Fiat on-ramp | `GA` (dashboard-driven) | `financial-os-loop` shows the deep link |
-| 03 | Secured working capital | `GA` | `financial-os-loop`, `yield-optimizer`, `langchain-agent`, `crewai-demo` |
+| 03 | Secured working capital | `GA` | `financial-os-loop`, `agentkit-ts-chatbot`, `yield-optimizer`, `langchain-agent`, `crewai-demo`, `openai-agents` |
 | 04 | Unsecured working capital | `Preview` | Email [hello@floelabs.xyz](mailto:hello@floelabs.xyz) for the design partner program |
-| 05 | x402 payment facilitator | `GA` | `financial-os-loop`, `x402-client`, `langchain-agent` |
+| 05 | x402 payment facilitator | `GA` | `financial-os-loop`, `agentkit-ts-chatbot`, `x402-client`, `langchain-agent`, `openai-agents` |
 | 06 | Credit & trust bureau | Reader `Beta` · Writer `Preview` | `financial-os-loop` registers a credit threshold |
 
 ---
@@ -90,7 +90,7 @@ Fund your agent wallet with fiat directly from the [Floe dashboard](https://dev-
 
 ## How it works — the full financial loop
 
-```
+```text
 1. Setup    register agent + wallet (ERC-8004 identity, spend limits)
 2. Fund     USDC in via cards, bank, Apple/Google Pay, or on-chain
 3. Borrow   one API call to instant_borrow — fixed rate, fixed term

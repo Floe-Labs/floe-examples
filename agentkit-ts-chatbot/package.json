@@ -2,6 +2,7 @@
   "name": "agentkit-ts-chatbot",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Conversational Floe agent using AgentKit + Vercel AI SDK.",
   "scripts": {
     "start": "tsx index.ts"

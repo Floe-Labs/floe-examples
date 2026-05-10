@@ -22,7 +22,7 @@ Floe + the **OpenAI Agents SDK**.
    }
    ```
 
-3. Your OpenAI agent now has access to all 36 Floe MCP tools — wallet, secured working capital, x402 preflight, credit thresholds.
+3. Your OpenAI agent now has access to all available Floe MCP tools — wallet, secured working capital, x402 preflight, credit thresholds.
 
 A runnable script will land here once the native adapter is published. To get notified, email [hello@floelabs.xyz](mailto:hello@floelabs.xyz) or follow [@FloeLabs](https://x.com/FloeLabs).
 
