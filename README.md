@@ -48,7 +48,7 @@ Each example is self-contained — clone, configure, run in under 5 minutes.
 | 01 | Agent Wallet | `GA` | All examples |
 | 02 | Fiat on-ramp | `GA` (dashboard-driven) | `financial-os-loop` shows the deep link |
 | 03 | Secured working capital | `GA` | `financial-os-loop`, `yield-optimizer`, `langchain-agent`, `crewai-demo` |
-| 04 | Unsecured working capital | `Preview` | [Join the waitlist](https://floelabs.xyz/unsecured) |
+| 04 | Unsecured working capital | `Preview` | Email [hello@floelabs.xyz](mailto:hello@floelabs.xyz) for the design partner program |
 | 05 | x402 payment facilitator | `GA` | `financial-os-loop`, `x402-client`, `langchain-agent` |
 | 06 | Credit & trust bureau | Reader `Beta` · Writer `Preview` | `financial-os-loop` registers a credit threshold |
 
