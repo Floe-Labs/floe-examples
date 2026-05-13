@@ -22,6 +22,10 @@ if (!FLOE_API_KEY) {
   console.error("Set FLOE_API_KEY in .env");
   process.exit(1);
 }
+if (!VAPI_SERVER_SECRET) {
+  console.error("Set VAPI_SERVER_SECRET in .env (required to authenticate Vapi webhooks)");
+  process.exit(1);
+}
 
 // ── Tool → x402 endpoint mapping ──────────────────────────────────────
 
@@ -118,14 +122,12 @@ const app = Fastify({ logger: true });
 // Vapi sends tool calls here
 app.post("/vapi/tool-call", async (request, reply) => {
   // Authenticate — verify the request came from Vapi
-  if (VAPI_SERVER_SECRET) {
-    const authHeader = request.headers["x-vapi-secret"] || request.headers.authorization;
-    const token = typeof authHeader === "string" && authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : authHeader;
-    if (token !== VAPI_SERVER_SECRET) {
-      return reply.status(401).send({ error: "Unauthorized" });
-    }
+  const authHeader = request.headers["x-vapi-secret"] || request.headers.authorization;
+  const token = typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : authHeader;
+  if (token !== VAPI_SERVER_SECRET) {
+    return reply.status(401).send({ error: "Unauthorized" });
   }
 
   // Validate body structure
@@ -165,9 +167,9 @@ app.post("/vapi/tool-call", async (request, reply) => {
 
     // Call the x402 API through Floe (with error isolation)
     try {
-      console.log(`🔧 Tool call: ${call.name}(${JSON.stringify(call.parameters)})`);
+      console.log(`🔧 Tool call: name=${call.name} id=${call.id}`);
       const result = await callViaFloe(endpoint, call.parameters);
-      console.log(`✅ Result: ${result.slice(0, 100)}...`);
+      console.log(`✅ Tool success: name=${call.name} id=${call.id} chars=${result.length}`);
 
       results.push({
         name: call.name,
@@ -175,7 +177,7 @@ app.post("/vapi/tool-call", async (request, reply) => {
         result,
       });
     } catch (err) {
-      console.error(`❌ Tool ${call.name} failed:`, err);
+      console.error(`❌ Tool failed: name=${call.name} id=${call.id}`, (err as Error).message);
       results.push({
         name: call.name,
         toolCallId: call.id,
@@ -198,7 +200,7 @@ app.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
   }
   console.log(`\n🎙️  Vapi webhook server running on port ${PORT}`);
   console.log(`   Tool-call endpoint: POST /vapi/tool-call`);
-  console.log(`   Auth: ${VAPI_SERVER_SECRET ? "enabled (VAPI_SERVER_SECRET)" : "⚠️  disabled (set VAPI_SERVER_SECRET for production)"}`);
+  console.log(`   Auth: enabled (VAPI_SERVER_SECRET)`);
   console.log(`   Floe proxy: ${FLOE_PROXY}`);
   console.log(`\n   Tools available:`);
   for (const [name, ep] of Object.entries(TOOL_ENDPOINTS)) {

@@ -12,7 +12,7 @@ A Vapi voice assistant that calls paid APIs through Floe's x402 proxy. All vendo
 
 ## Architecture
 
-```
+```text
 Caller  ──►  Vapi  ──►  Voice Assistant (GPT-4o + ElevenLabs)
                               │
                               ├── Tool: "search_web"  ──►  Floe proxy  ──►  Firecrawl
