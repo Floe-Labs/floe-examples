@@ -1,6 +1,7 @@
 {
   "name": "vapi-voice-agent",
   "version": "1.0.0",
+  "private": true,
   "description": "Vapi voice agent with unified x402 billing via Floe",
   "type": "module",
   "scripts": {
