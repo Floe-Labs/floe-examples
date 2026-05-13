@@ -88,7 +88,7 @@ app.post("/vapi/tool-call", async (request) => {
       toolCallList: Array<{
         id: string;
         name: string;
-        arguments: Record<string, string>;
+        parameters: Record<string, string>;
       }>;
     };
   };
@@ -104,17 +104,19 @@ app.post("/vapi/tool-call", async (request) => {
 
     if (!endpoint) {
       results.push({
+        name: call.name,
         toolCallId: call.id,
         result: `Unknown tool: ${call.name}`,
       });
       continue;
     }
 
-    console.log(`🔧 Tool call: ${call.name}(${JSON.stringify(call.arguments)})`);
-    const result = await callViaFloe(endpoint, call.arguments);
+    console.log(`🔧 Tool call: ${call.name}(${JSON.stringify(call.parameters)})`);
+    const result = await callViaFloe(endpoint, call.parameters);
     console.log(`✅ Result: ${result.slice(0, 100)}...`);
 
     results.push({
+      name: call.name,
       toolCallId: call.id,
       result,
     });
