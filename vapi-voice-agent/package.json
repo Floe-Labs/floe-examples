@@ -1,0 +1,19 @@
+{
+  "name": "vapi-voice-agent",
+  "version": "1.0.0",
+  "description": "Vapi voice agent with unified x402 billing via Floe",
+  "type": "module",
+  "scripts": {
+    "setup": "tsx setup.ts",
+    "start": "tsx server.ts"
+  },
+  "dependencies": {
+    "@vapi-ai/server-sdk": "^0.3.0",
+    "fastify": "^4.28.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.0",
+    "typescript": "^5.3.0"
+  }
+}
