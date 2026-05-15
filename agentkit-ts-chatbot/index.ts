@@ -1,3 +1,9 @@
+// agentkit-ts-chatbot (self-custody variant)
+//
+// ⚠️  This example signs from PRIVATE_KEY. Most agents should prefer the
+//     managed-wallet flow — no key in env, no gas, no chain setup:
+//     https://floe-labs.gitbook.io/docs/getting-started/quickstart
+
 import "dotenv/config";
 import * as readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
