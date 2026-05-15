@@ -1,6 +1,15 @@
 # financial-os-loop
 
-**The canonical end-to-end Floe example.**
+**The canonical end-to-end Floe example — self-custody variant.**
+
+> ⚠️ **For most agents you do not want to start here.** Floe's default flow is
+> a managed wallet provisioned per agent and a `floe_…` runtime API key — no
+> private key in your environment, no gas, no chain or RPC config. See the
+> [Quickstart](https://floe-labs.gitbook.io/docs/getting-started/quickstart)
+> for the no-crypto path. This example demonstrates the **self-custody**
+> variant: useful if you're holding signing keys in your own HSM/KMS or
+> integrating with an existing wallet stack. The bulk of Floe's API works
+> identically across both paths.
 
 Wires every GA component of the Financial OS in a single runnable script:
 
@@ -33,7 +42,9 @@ Unsecured working capital (04) and the ERC-8004 portable credit reader are `Prev
 
 - Node.js 18+ (for TS) or Python 3.10+ (for Python)
 - A Floe API key from [dev-dashboard.floelabs.xyz](https://dev-dashboard.floelabs.xyz)
-- A funded wallet on Base (or run the on-ramp link printed at step 2)
+- A funded self-custody wallet on Base (the example signs from `PRIVATE_KEY`).
+  If you don't want to manage a key, use the [managed-wallet quickstart](https://floe-labs.gitbook.io/docs/getting-started/quickstart)
+  instead — the agent's wallet is custodied by Floe and funded with a card.
 
 ---
 

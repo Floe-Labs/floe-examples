@@ -1,3 +1,11 @@
+// financial-os-loop (self-custody variant)
+//
+// ⚠️  Self-custody example — signs every transaction from PRIVATE_KEY. Most
+//     agents should use the managed-wallet flow instead (no key in env, no
+//     gas to manage): https://floe-labs.gitbook.io/docs/getting-started/quickstart
+//     Pick this path if you hold signing keys in your own HSM/KMS or are
+//     integrating with an existing wallet stack.
+
 import "dotenv/config";
 import { AgentKit, ViemWalletProvider } from "@coinbase/agentkit";
 import { floeActionProvider } from "floe-agent";

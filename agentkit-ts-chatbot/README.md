@@ -2,6 +2,9 @@
 
 Minimal conversational agent in TypeScript: **AgentKit + Vercel AI SDK + Floe**.
 
+> ⚠️ Self-custody variant. Signs from PRIVATE_KEY. For the no-crypto path
+> (managed wallet, no key in env, card funding), see the [Quickstart](https://floe-labs.gitbook.io/docs/getting-started/quickstart).
+
 Mirrors the Python `langchain-agent` example. Shows how to expose every Floe action as a tool to an LLM and have it borrow, pay an x402 endpoint, and repay through natural language.
 
 ## Components covered
