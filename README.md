@@ -1,12 +1,14 @@
 # Floe Examples
 
-**The Financial OS for AI Agents — runnable examples.**
+**Credit and payments for AI agent developers — runnable reference agents. No crypto required.**
 
-Wallet, fiat on/off-ramp, working capital, x402 payments, and portable credit. One SDK. Examples here span TypeScript and Python and cover every GA component of the Floe stack.
+1. **Sign up with email + a funding source.** Card, Apple Pay, Google Pay, or bank transfer. Floe provisions your wallets in the background — no MetaMask, no seed phrase, no gas token.
+2. **Floe issues an x402 credit line to your agent's wallet.** Set spending controls — per-call cap, daily limit, allowed destinations.
+3. **Your agent pays vendors per-call; you get real-time visibility.** Every call is a typed receipt: target URL, amount, status, time. Reconcile, alert, or revoke from the dashboard.
+
+Reference agents here span TypeScript and Python and cover every GA component of the Floe stack. Each is self-contained — clone, configure, run in under 5 minutes. Fork to start.
 
 > **Proof points:** 3,000+ secured working capital lines issued · zero defaults · 13,000+ x402 APIs reachable via the Floe proxy.
-
-Each example is self-contained — clone, configure, run in under 5 minutes.
 
 ---
 
