@@ -13,7 +13,7 @@ import Fastify from "fastify";
 import "dotenv/config";
 
 const FLOE_API_KEY = process.env.FLOE_API_KEY;
-const FLOE_PROXY = "https://credit-api.floelabs.xyz/v1/proxy/fetch";
+const FLOE_PROXY = process.env.FLOE_PROXY_URL || "https://credit-api.floelabs.xyz/v1/proxy/fetch";
 const VAPI_SERVER_SECRET = process.env.VAPI_SERVER_SECRET;
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const FETCH_TIMEOUT_MS = 15_000;
@@ -95,8 +95,10 @@ async function callViaFloe(endpoint: ToolEndpoint, args: Record<string, string>)
 
 interface VapiToolCall {
   id: string;
-  name: string;
-  parameters: Record<string, string>;
+  function: {
+    name: string;
+    arguments: Record<string, string> | string;
+  };
 }
 
 interface VapiToolCallBody {
@@ -130,6 +132,16 @@ app.post("/vapi/tool-call", async (request, reply) => {
     return reply.status(401).send({ error: "Unauthorized" });
   }
 
+  // DEBUG — log incoming Vapi payload shape
+  const body = request.body as any;
+  const msgType = body?.message?.type ?? "<no message.type>";
+  const hasToolCallList = Array.isArray(body?.message?.toolCallList);
+  const hasToolCalls = Array.isArray(body?.message?.toolCalls);
+  console.log(`📨 Incoming Vapi webhook: message.type="${msgType}" toolCallList=${hasToolCallList} toolCalls=${hasToolCalls}`);
+  if (msgType === "tool-calls" || hasToolCalls || hasToolCallList) {
+    console.log("   Full message:", JSON.stringify(body.message, null, 2).slice(0, 1500));
+  }
+
   // Validate body structure
   if (!isValidBody(request.body)) {
     return { results: [] };
@@ -143,22 +155,30 @@ app.post("/vapi/tool-call", async (request, reply) => {
   const results = [];
 
   for (const call of message.toolCallList) {
-    const endpoint = TOOL_ENDPOINTS[call.name];
+    const name = call.function?.name;
+    const args =
+      typeof call.function?.arguments === "string"
+        ? (() => {
+            try { return JSON.parse(call.function.arguments as string); } catch { return {}; }
+          })()
+        : (call.function?.arguments as Record<string, string>) || {};
+
+    const endpoint = TOOL_ENDPOINTS[name];
 
     if (!endpoint) {
       results.push({
-        name: call.name,
+        name,
         toolCallId: call.id,
-        result: `Unknown tool: ${call.name}`,
+        result: `Unknown tool: ${name}`,
       });
       continue;
     }
 
     // Validate required arguments
-    const missing = endpoint.requiredArgs.filter((arg) => !call.parameters?.[arg]);
+    const missing = endpoint.requiredArgs.filter((arg) => !args[arg]);
     if (missing.length > 0) {
       results.push({
-        name: call.name,
+        name,
         toolCallId: call.id,
         result: `Missing required arguments: ${missing.join(", ")}`,
       });
@@ -167,19 +187,20 @@ app.post("/vapi/tool-call", async (request, reply) => {
 
     // Call the x402 API through Floe (with error isolation)
     try {
-      console.log(`🔧 Tool call: name=${call.name} id=${call.id}`);
-      const result = await callViaFloe(endpoint, call.parameters);
-      console.log(`✅ Tool success: name=${call.name} id=${call.id} chars=${result.length}`);
+      console.log(`🔧 Tool call: name=${name} id=${call.id} args=${JSON.stringify(args)}`);
+      const result = await callViaFloe(endpoint, args);
+      console.log(`✅ Tool success: name=${name} id=${call.id} chars=${result.length}`);
+      console.log(`   Result preview: ${result.slice(0, 400)}`);
 
       results.push({
-        name: call.name,
+        name,
         toolCallId: call.id,
         result,
       });
     } catch (err) {
-      console.error(`❌ Tool failed: name=${call.name} id=${call.id}`, (err as Error).message);
+      console.error(`❌ Tool failed: name=${name} id=${call.id}`, (err as Error).message);
       results.push({
-        name: call.name,
+        name,
         toolCallId: call.id,
         result: `Tool error: ${(err as Error).message || "unknown error"}`,
       });
