@@ -1,10 +1,10 @@
 # Vapi + Floe: Voice Agent with Unified x402 Billing
 
-A Vapi voice assistant that calls paid APIs through Floe's x402 proxy. All vendor costs — search, news, AI expert — billed to one credit line.
+A Vapi voice assistant that calls paid crypto-market APIs through Floe's x402 proxy. All vendor costs — news, prices, on-chain data — billed to one credit line.
 
 ## What this shows
 
-- Voice agent calls 3 paid APIs during a conversation (web search, news, AI analysis)
+- Voice agent calls 3 paid APIs during a conversation (crypto news, market price, Base block number)
 - All payments routed through Floe — one API key, one balance, one transaction log
 - No wallet, no USDC management — just `Authorization: Bearer floe_...`
 - After the call, `GET /agents/transactions` shows every charge
@@ -15,12 +15,13 @@ A Vapi voice assistant that calls paid APIs through Floe's x402 proxy. All vendo
 ```text
 Caller  ──►  Vapi  ──►  Voice Assistant (GPT-4o + ElevenLabs)
                               │
-                              ├── Tool: "search_web"  ──►  Floe proxy  ──►  Exa Search   ($0.005)
-                              ├── Tool: "get_news"    ──►  Floe proxy  ──►  twit.sh      ($0.001)
-                              └── Tool: "ask_expert"  ──►  Floe proxy  ──►  Venice AI    ($0.01)
+                              ├── Tool: "get_crypto_news"    ──►  Floe proxy  ──►  Otto AI / crypto-news       ($0.001)
+                              ├── Tool: "get_market_price"   ──►  Floe proxy  ──►  Otto AI / hyperliquid       ($0.001)
+                              └── Tool: "get_block_number"   ──►  Floe proxy  ──►  OneSource / chain           ($0.001)
 
                          All 3 tools go through one Floe credit line.
                          One API key. One balance. One transaction log.
+                         All endpoints settle via Coinbase's CDP x402 facilitator.
 ```
 
 ## Setup (5 minutes)
@@ -77,9 +78,10 @@ npx tsx server.ts
 In the Vapi dashboard, assign a phone number to your assistant and call it. Or use the Vapi web widget to test.
 
 Try saying:
-- "Search the web for the latest AI agent frameworks"
-- "What are people on X saying about voice AI right now?"
-- "I need an expert analysis of the pros and cons of serverless architecture"
+- "What's the latest crypto news?"
+- "What's BTC trading at right now?"
+- "How about ETH funding rate?"
+- "What block is Base on right now?"
 
 ### 7. Check your spending
 

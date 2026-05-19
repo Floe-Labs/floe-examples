@@ -27,14 +27,14 @@ if (!SERVER_URL) {
 const vapi = new VapiClient({ token: VAPI_API_KEY });
 const toolCallUrl = `${SERVER_URL}/vapi/tool-call`;
 
-const SYSTEM_PROMPT = `You are a helpful research assistant on a phone call. You have three tools:
+const SYSTEM_PROMPT = `You are a crypto market assistant on a phone call. You have three tools:
 
-1. search_web — Semantic web search (Exa). Use this when the caller asks about facts, references, or anything you need to look up on the open web.
-2. get_news — Real-time chatter on X/Twitter about a topic (twit.sh). Use this when the caller wants to know what people are saying right now, current buzz, breaking takes, or social sentiment.
-3. ask_expert — Ask an AI expert (Venice AI) a detailed question. Use this when the caller needs in-depth analysis or a complex explanation.
+1. get_crypto_news — Real-time crypto market news with sentiment and top headlines (Otto AI). Use when the caller asks "what's happening in crypto", market mood, or wants a news rundown.
+2. get_market_price — Live mark price, funding rate, and open interest for a tradable asset (Hyperliquid market data via Otto AI). Use when the caller asks for the price or funding rate of an asset like BTC, ETH, SOL, etc. The required argument is the asset ticker.
+3. get_block_number — Current Base mainnet block height. Use when the caller asks about Base chain activity or wants a sanity check that on-chain queries are live.
 
 Keep your responses concise and conversational — you're on a phone call, not writing an essay.
-When you use a tool, briefly tell the caller what you're doing ("Let me search for that..." or "Checking what people are saying...").
+When you use a tool, briefly tell the caller what you're doing ("Let me check the latest news..." or "Pulling BTC's price now...").
 Summarize tool results in 2-3 sentences max.`;
 
 async function main() {
@@ -43,74 +43,70 @@ async function main() {
   // Step 1: Create custom tools
   console.log("📦 Creating tools...");
 
-  const searchTool = await vapi.tools.create({
+  const cryptoNewsTool = await vapi.tools.create({
     type: "function",
     function: {
-      name: "search_web",
-      description: "Semantic web search via Exa. Returns 3 most relevant web results as text. Use for facts, references, and general web lookups.",
+      name: "get_crypto_news",
+      description: "Get real-time crypto market news with sentiment analysis and top headlines (Otto AI). No arguments needed.",
       parameters: {
         type: "object",
-        properties: {
-          query: { type: "string", description: "The search query" },
-        },
-        required: ["query"],
+        properties: {},
+        required: [],
       },
     },
     server: { url: toolCallUrl },
   });
-  console.log(`   ✅ search_web (${searchTool.id})`);
+  console.log(`   ✅ get_crypto_news (${cryptoNewsTool.id})`);
 
-  const newsTool = await vapi.tools.create({
+  const marketPriceTool = await vapi.tools.create({
     type: "function",
     function: {
-      name: "get_news",
-      description: "Get real-time chatter from X/Twitter on a topic via twit.sh. Returns up to 5 recent posts. Use this for current sentiment, breaking takes, or what people are saying right now.",
+      name: "get_market_price",
+      description: "Get live mark/oracle price, funding rate, open interest, and size specs for a Hyperliquid tradable asset. Pass the asset ticker (e.g. BTC, ETH, SOL).",
       parameters: {
         type: "object",
         properties: {
-          topic: { type: "string", description: "The topic to fetch X/Twitter chatter about" },
+          asset: { type: "string", description: "Asset ticker (BTC, ETH, SOL, etc.)" },
         },
-        required: ["topic"],
+        required: ["asset"],
       },
     },
     server: { url: toolCallUrl },
   });
-  console.log(`   ✅ get_news (${newsTool.id})`);
+  console.log(`   ✅ get_market_price (${marketPriceTool.id})`);
 
-  const expertTool = await vapi.tools.create({
+  const blockNumberTool = await vapi.tools.create({
     type: "function",
     function: {
-      name: "ask_expert",
-      description: "Ask an AI expert (Venice AI, GPT-class model) a detailed question for in-depth analysis or complex explanations.",
+      name: "get_block_number",
+      description: "Get the current Base mainnet block height via eth_blockNumber. No arguments needed.",
       parameters: {
         type: "object",
-        properties: {
-          question: { type: "string", description: "The detailed question to ask" },
-        },
-        required: ["question"],
+        properties: {},
+        required: [],
       },
     },
     server: { url: toolCallUrl },
   });
-  console.log(`   ✅ ask_expert (${expertTool.id})`);
+  console.log(`   ✅ get_block_number (${blockNumberTool.id})`);
 
   // Step 2: Create assistant with tools attached
   console.log("\n🤖 Creating assistant...");
 
   const assistant = await vapi.assistants.create({
-    name: "Floe Research Assistant",
+    name: "Floe Crypto Market Assistant",
     model: {
       provider: "openai",
       model: "gpt-4o",
       messages: [{ role: "system", content: SYSTEM_PROMPT }],
-      toolIds: [searchTool.id, newsTool.id, expertTool.id],
+      toolIds: [cryptoNewsTool.id, marketPriceTool.id, blockNumberTool.id],
     },
     voice: {
       provider: "11labs",
       voiceId: "cgSgspJ2msm6clMCkdW9",
     },
     firstMessage:
-      "Hi! I'm a research assistant. I can search the web, check the latest news, or ask an AI expert for detailed analysis. What would you like to know?",
+      "Hi! I can pull live crypto news, give you the latest price and funding for an asset like BTC or ETH, or check what block Base is on. What do you want to know?",
   });
 
   console.log(`   ✅ Assistant created: ${assistant.name} (${assistant.id})`);

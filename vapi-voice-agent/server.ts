@@ -36,29 +36,34 @@ interface ToolEndpoint {
   buildBody: (args: Record<string, string>) => string;
 }
 
+// All endpoints below are listed on the x402 Bazaar (Coinbase CDP
+// facilitator) and settle reliably against Floe's managed-agent flow.
+// Replaced the previous trio (Exa search, twit.sh, Venice) — Exa's
+// merchant-side facilitator failed on settle, twit.sh required a
+// separate API key, and Venice was 10 USDC/call. These three are all
+// $0.001-$0.003 per call on Base mainnet via CDP.
 const TOOL_ENDPOINTS: Record<string, ToolEndpoint> = {
-  search_web: {
-    buildUrl: () => "https://api.exa.ai/search",
-    method: "POST",
-    requiredArgs: ["query"],
-    buildBody: (args) => JSON.stringify({ query: args.query, numResults: 3 }),
-  },
-  get_news: {
-    buildUrl: (args) =>
-      `https://api.twit.sh/v1/x402/tweets?q=${encodeURIComponent(args.topic)}&limit=5`,
+  get_crypto_news: {
+    buildUrl: () => "https://x402.ottoai.services/crypto-news",
     method: "GET",
-    requiredArgs: ["topic"],
+    requiredArgs: [],
     buildBody: () => "",
   },
-  ask_expert: {
-    buildUrl: () => "https://api.venice.ai/api/v1/chat/completions",
-    method: "POST",
-    requiredArgs: ["question"],
-    buildBody: (args) =>
-      JSON.stringify({
-        model: "venice-uncensored",
-        messages: [{ role: "user", content: args.question }],
-      }),
+  get_market_price: {
+    // Live mark/oracle price, funding rate, OI for any Hyperliquid asset
+    // (BTC, ETH, SOL, etc.). $0.001 per call.
+    buildUrl: (args) =>
+      `https://x402.ottoai.services/hyperliquid-market?asset=${encodeURIComponent(args.asset)}`,
+    method: "GET",
+    requiredArgs: ["asset"],
+    buildBody: () => "",
+  },
+  get_block_number: {
+    // Current Base mainnet block height via eth_blockNumber. $0.001 per call.
+    buildUrl: () => "https://skills.onesource.io/api/chain/block-number",
+    method: "GET",
+    requiredArgs: [],
+    buildBody: () => "",
   },
 };
 

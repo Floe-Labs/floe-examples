@@ -1,9 +1,17 @@
+/**
+ * Patch the `server.url` of existing Vapi tools when your tunnel URL
+ * (ngrok / production hostname) changes — without re-creating the
+ * tools. Paste the IDs printed by `setup.ts` into TOOL_IDS below the
+ * first time you provision the assistant, and re-run this script
+ * whenever SERVER_URL changes.
+ */
 import "dotenv/config";
 
+// Replace with the IDs printed by `npx tsx setup.ts`.
 const TOOL_IDS = [
-  "ee607123-9a5e-474f-9bae-4476ac413949", // search_web
-  "11159562-1368-49ee-9c6b-e5cf7d20e7f6", // get_news
-  "292d5ef1-c49c-4eec-adfd-0240278b5f10", // ask_expert
+  "REPLACE_WITH_get_crypto_news_TOOL_ID",
+  "REPLACE_WITH_get_market_price_TOOL_ID",
+  "REPLACE_WITH_get_block_number_TOOL_ID",
 ];
 
 const newUrl = `${process.env.SERVER_URL}/vapi/tool-call`;
