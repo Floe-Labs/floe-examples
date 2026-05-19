@@ -15,9 +15,9 @@ A Vapi voice assistant that calls paid APIs through Floe's x402 proxy. All vendo
 ```text
 Caller  ──►  Vapi  ──►  Voice Assistant (GPT-4o + ElevenLabs)
                               │
-                              ├── Tool: "search_web"  ──►  Floe proxy  ──►  Firecrawl
-                              ├── Tool: "get_news"    ──►  Floe proxy  ──►  Gloria AI
-                              └── Tool: "ask_expert"  ──►  Floe proxy  ──►  AskClaude
+                              ├── Tool: "search_web"  ──►  Floe proxy  ──►  Exa Search   ($0.005)
+                              ├── Tool: "get_news"    ──►  Floe proxy  ──►  twit.sh      ($0.001)
+                              └── Tool: "ask_expert"  ──►  Floe proxy  ──►  Venice AI    ($0.01)
 
                          All 3 tools go through one Floe credit line.
                          One API key. One balance. One transaction log.
@@ -77,8 +77,8 @@ npx tsx server.ts
 In the Vapi dashboard, assign a phone number to your assistant and call it. Or use the Vapi web widget to test.
 
 Try saying:
-- "Search for the latest AI agent frameworks"
-- "What's in the news about voice AI?"
+- "Search the web for the latest AI agent frameworks"
+- "What are people on X saying about voice AI right now?"
 - "I need an expert analysis of the pros and cons of serverless architecture"
 
 ### 7. Check your spending

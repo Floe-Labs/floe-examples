@@ -29,12 +29,12 @@ const toolCallUrl = `${SERVER_URL}/vapi/tool-call`;
 
 const SYSTEM_PROMPT = `You are a helpful research assistant on a phone call. You have three tools:
 
-1. search_web — Search the web for current information. Use this when the caller asks about recent events, facts, or anything you need to look up.
-2. get_news — Get the latest news on a topic. Use this when the caller asks about news or current events.
-3. ask_expert — Ask an AI expert a detailed question. Use this when the caller needs in-depth analysis or a complex explanation.
+1. search_web — Semantic web search (Exa). Use this when the caller asks about facts, references, or anything you need to look up on the open web.
+2. get_news — Real-time chatter on X/Twitter about a topic (twit.sh). Use this when the caller wants to know what people are saying right now, current buzz, breaking takes, or social sentiment.
+3. ask_expert — Ask an AI expert (Venice AI) a detailed question. Use this when the caller needs in-depth analysis or a complex explanation.
 
 Keep your responses concise and conversational — you're on a phone call, not writing an essay.
-When you use a tool, briefly tell the caller what you're doing ("Let me search for that..." or "Checking the latest news...").
+When you use a tool, briefly tell the caller what you're doing ("Let me search for that..." or "Checking what people are saying...").
 Summarize tool results in 2-3 sentences max.`;
 
 async function main() {
@@ -47,7 +47,7 @@ async function main() {
     type: "function",
     function: {
       name: "search_web",
-      description: "Search the web for current information. Returns web results as text.",
+      description: "Semantic web search via Exa. Returns 3 most relevant web results as text. Use for facts, references, and general web lookups.",
       parameters: {
         type: "object",
         properties: {
@@ -64,11 +64,11 @@ async function main() {
     type: "function",
     function: {
       name: "get_news",
-      description: "Get the latest news headlines and summaries on a topic.",
+      description: "Get real-time chatter from X/Twitter on a topic via twit.sh. Returns up to 5 recent posts. Use this for current sentiment, breaking takes, or what people are saying right now.",
       parameters: {
         type: "object",
         properties: {
-          topic: { type: "string", description: "The news topic to search for" },
+          topic: { type: "string", description: "The topic to fetch X/Twitter chatter about" },
         },
         required: ["topic"],
       },
@@ -81,7 +81,7 @@ async function main() {
     type: "function",
     function: {
       name: "ask_expert",
-      description: "Ask an AI expert a detailed question for in-depth analysis.",
+      description: "Ask an AI expert (Venice AI, GPT-class model) a detailed question for in-depth analysis or complex explanations.",
       parameters: {
         type: "object",
         properties: {

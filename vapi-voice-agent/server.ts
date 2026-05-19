@@ -30,7 +30,7 @@ if (!VAPI_SERVER_SECRET) {
 // ── Tool → x402 endpoint mapping ──────────────────────────────────────
 
 interface ToolEndpoint {
-  url: string;
+  buildUrl: (args: Record<string, string>) => string;
   method: string;
   requiredArgs: string[];
   buildBody: (args: Record<string, string>) => string;
@@ -38,22 +38,27 @@ interface ToolEndpoint {
 
 const TOOL_ENDPOINTS: Record<string, ToolEndpoint> = {
   search_web: {
-    url: "https://api.firecrawl.dev/v1/x402/search",
+    buildUrl: () => "https://api.exa.ai/search",
     method: "POST",
     requiredArgs: ["query"],
-    buildBody: (args) => JSON.stringify({ query: args.query, limit: 3 }),
+    buildBody: (args) => JSON.stringify({ query: args.query, numResults: 3 }),
   },
   get_news: {
-    url: "https://api.gloria.ai/v1/signals",
-    method: "POST",
+    buildUrl: (args) =>
+      `https://api.twit.sh/v1/x402/tweets?q=${encodeURIComponent(args.topic)}&limit=5`,
+    method: "GET",
     requiredArgs: ["topic"],
-    buildBody: (args) => JSON.stringify({ topic: args.topic, limit: 5 }),
+    buildBody: () => "",
   },
   ask_expert: {
-    url: "https://askclaude.shop/api/ask",
+    buildUrl: () => "https://api.venice.ai/api/v1/chat/completions",
     method: "POST",
     requiredArgs: ["question"],
-    buildBody: (args) => JSON.stringify({ question: args.question, model: "haiku" }),
+    buildBody: (args) =>
+      JSON.stringify({
+        model: "venice-uncensored",
+        messages: [{ role: "user", content: args.question }],
+      }),
   },
 };
 
@@ -64,18 +69,22 @@ async function callViaFloe(endpoint: ToolEndpoint, args: Record<string, string>)
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
+    const proxyPayload: Record<string, unknown> = {
+      url: endpoint.buildUrl(args),
+      method: endpoint.method,
+      headers: { "Content-Type": "application/json" },
+    };
+    if (endpoint.method !== "GET" && endpoint.method !== "HEAD") {
+      proxyPayload.body = endpoint.buildBody(args);
+    }
+
     const response = await fetch(FLOE_PROXY, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${FLOE_API_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        url: endpoint.url,
-        method: endpoint.method,
-        headers: { "Content-Type": "application/json" },
-        body: endpoint.buildBody(args),
-      }),
+      body: JSON.stringify(proxyPayload),
       signal: controller.signal,
     });
 
@@ -225,6 +234,7 @@ app.listen({ port: PORT, host: "0.0.0.0" }, (err) => {
   console.log(`   Floe proxy: ${FLOE_PROXY}`);
   console.log(`\n   Tools available:`);
   for (const [name, ep] of Object.entries(TOOL_ENDPOINTS)) {
-    console.log(`     ${name} → ${ep.url}`);
+    const sampleArgs = Object.fromEntries(ep.requiredArgs.map((a) => [a, "<arg>"]));
+    console.log(`     ${name} → ${ep.method} ${ep.buildUrl(sampleArgs)}`);
   }
 });
