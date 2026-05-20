@@ -15,9 +15,9 @@ A Vapi voice assistant that calls paid crypto-market APIs through Floe's x402 pr
 ```text
 Caller  ──►  Vapi  ──►  Voice Assistant (GPT-4o + ElevenLabs)
                               │
-                              ├── Tool: "get_crypto_news"    ──►  Floe proxy  ──►  Otto AI / crypto-news       ($0.001)
-                              ├── Tool: "get_market_price"   ──►  Floe proxy  ──►  Otto AI / hyperliquid       ($0.001)
-                              └── Tool: "get_block_number"   ──►  Floe proxy  ──►  OneSource / chain           ($0.001)
+                              ├── Tool: "get_crypto_news"    ──►  Floe proxy  ──►  Otto AI / crypto-news       (~$0.001–$0.003)
+                              ├── Tool: "get_market_price"   ──►  Floe proxy  ──►  Otto AI / hyperliquid       (~$0.001–$0.003)
+                              └── Tool: "get_block_number"   ──►  Floe proxy  ──►  OneSource / chain           (~$0.001–$0.003)
 
                          All 3 tools go through one Floe credit line.
                          One API key. One balance. One transaction log.

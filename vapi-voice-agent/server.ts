@@ -169,12 +169,18 @@ app.post("/vapi/tool-call", async (request, reply) => {
 
   for (const call of message.toolCallList) {
     const name = call.function?.name;
-    const args =
+    const parsedArgs =
       typeof call.function?.arguments === "string"
         ? (() => {
             try { return JSON.parse(call.function.arguments as string); } catch { return {}; }
           })()
-        : (call.function?.arguments as Record<string, string>) || {};
+        : call.function?.arguments;
+    // Normalize: JSON.parse can yield null/primitives/arrays — coerce anything
+    // that isn't a plain object back to {} so the validation loop never throws.
+    const args: Record<string, string> =
+      parsedArgs && typeof parsedArgs === "object" && !Array.isArray(parsedArgs)
+        ? (parsedArgs as Record<string, string>)
+        : {};
 
     const endpoint = TOOL_ENDPOINTS[name];
 
@@ -200,10 +206,13 @@ app.post("/vapi/tool-call", async (request, reply) => {
 
     // Call the x402 API through Floe (with error isolation)
     try {
-      console.log(`🔧 Tool call: name=${name} id=${call.id} args=${JSON.stringify(args)}`);
+      console.log(`🔧 Tool: ${name} (${call.id})`);
       const result = await callViaFloe(endpoint, args);
-      console.log(`✅ Tool success: name=${name} id=${call.id} chars=${result.length}`);
-      console.log(`   Result preview: ${result.slice(0, 400)}`);
+      console.log(`✅ Tool: ${name} (${call.id}) chars=${result.length}`);
+      if (DEBUG) {
+        console.log(`   args=${JSON.stringify(args)}`);
+        console.log(`   Result preview: ${result.slice(0, 400)}`);
+      }
 
       results.push({
         name,
