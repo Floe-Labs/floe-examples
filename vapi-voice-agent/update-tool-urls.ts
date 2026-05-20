@@ -4,6 +4,8 @@
  * tools. Paste the IDs printed by `setup.ts` into TOOL_IDS below the
  * first time you provision the assistant, and re-run this script
  * whenever SERVER_URL changes.
+ *
+ * See README.md → "When your ngrok URL changes" for the full workflow.
  */
 import "dotenv/config";
 

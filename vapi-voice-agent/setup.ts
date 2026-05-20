@@ -103,7 +103,7 @@ async function main() {
     },
     voice: {
       provider: "11labs",
-      voiceId: "cgSgspJ2msm6clMCkdW9",
+      voiceId: "cgSgspJ2msm6clMCkdW9", // ElevenLabs "Jessica" — swap for any voiceId from the ElevenLabs library
     },
     firstMessage:
       "Hi! I can pull live crypto news, give you the latest price and funding for an asset like BTC or ETH, or check what block Base is on. What do you want to know?",

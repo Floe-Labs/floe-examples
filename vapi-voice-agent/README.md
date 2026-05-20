@@ -92,6 +92,16 @@ curl -H "Authorization: Bearer $FLOE_API_KEY" \
 
 Every tool call shows up as a separate line item with the exact cost.
 
+### When your ngrok URL changes
+
+Restarting ngrok hands you a new public hostname. Instead of re-running `setup.ts` (which would create three new duplicate tools every time), patch the existing tools in place:
+
+1. Open `update-tool-urls.ts` and paste the three tool IDs printed by `setup.ts` into `TOOL_IDS`.
+2. Update `SERVER_URL` in `.env` with the new ngrok URL.
+3. Run `npx tsx update-tool-urls.ts`.
+
+The assistant keeps the same ID and the same phone-number assignment — only the webhook URL is rewritten.
+
 ## How it works
 
 1. Caller speaks to the Vapi voice assistant
@@ -122,13 +132,20 @@ To add a new x402 API as a tool:
 2. Create the tool in the Vapi dashboard (or via the API) and attach it to your assistant
 3. Restart the server
 
-Any of the [76 APIs in Floe's x402 directory](https://floe-labs.gitbook.io/docs/x402-directory) work — just add the URL.
+Any of the [13,000+ x402 APIs reachable via the Floe proxy](https://floe-labs.gitbook.io/docs/x402-directory) work — just add the URL.
 
 ## Security
 
 - **Webhook auth:** Set `VAPI_SERVER_SECRET` in `.env` and configure the same secret as a credential in Vapi's dashboard. The server rejects requests without a matching secret.
 - **Floe proxy auth:** All x402 API calls go through Floe's proxy, which requires your `FLOE_API_KEY`. The API key is never exposed to Vapi or the caller.
-- **Spend limits:** Use Floe's `set_spend_limit` to cap how much the agent can spend per session.
+- **Spend limits:** Cap how much USDC the agent can spend in a session with a single PUT against Floe's credit API. `limitRaw` is in USDC base units (6 decimals), so `500000` = $0.50. The session window resets when you call this; the cap is operator-defined and distinct from the on-chain credit limit.
+
+  ```bash
+  curl -X PUT -H "Authorization: Bearer $FLOE_API_KEY" \
+    -H "Content-Type: application/json" \
+    -d '{"limitRaw":"500000"}' \
+    https://credit-api.floelabs.xyz/v1/agents/spend-limit
+  ```
 
 ## Files
 
@@ -136,5 +153,6 @@ Any of the [76 APIs in Floe's x402 directory](https://floe-labs.gitbook.io/docs/
 |------|---------|
 | `server.ts` | Webhook server — authenticates Vapi requests, routes tool calls through Floe |
 | `setup.ts` | Creates Vapi tools + assistant (run once) |
+| `update-tool-urls.ts` | Patches existing Vapi tools' webhook URL when your ngrok tunnel changes (run instead of re-running `setup.ts`) |
 | `.env.example` | Configuration template |
 | `package.json` | Dependencies (Vapi SDK, Fastify, dotenv) |

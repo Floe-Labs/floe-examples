@@ -17,6 +17,7 @@ const FLOE_PROXY = process.env.FLOE_PROXY_URL || "https://credit-api.floelabs.xy
 const VAPI_SERVER_SECRET = process.env.VAPI_SERVER_SECRET;
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const FETCH_TIMEOUT_MS = 15_000;
+const DEBUG = process.env.DEBUG === "1";
 
 if (!FLOE_API_KEY) {
   console.error("Set FLOE_API_KEY in .env");
@@ -36,12 +37,8 @@ interface ToolEndpoint {
   buildBody: (args: Record<string, string>) => string;
 }
 
-// All endpoints below are listed on the x402 Bazaar (Coinbase CDP
-// facilitator) and settle reliably against Floe's managed-agent flow.
-// Replaced the previous trio (Exa search, twit.sh, Venice) — Exa's
-// merchant-side facilitator failed on settle, twit.sh required a
-// separate API key, and Venice was 10 USDC/call. These three are all
-// $0.001-$0.003 per call on Base mainnet via CDP.
+// All endpoints are listed on the x402 Bazaar (Coinbase CDP facilitator)
+// and settle reliably through Floe's proxy. $0.001–$0.003 per call on Base mainnet.
 const TOOL_ENDPOINTS: Record<string, ToolEndpoint> = {
   get_crypto_news: {
     buildUrl: () => "https://x402.ottoai.services/crypto-news",
@@ -146,14 +143,16 @@ app.post("/vapi/tool-call", async (request, reply) => {
     return reply.status(401).send({ error: "Unauthorized" });
   }
 
-  // DEBUG — log incoming Vapi payload shape
-  const body = request.body as any;
-  const msgType = body?.message?.type ?? "<no message.type>";
-  const hasToolCallList = Array.isArray(body?.message?.toolCallList);
-  const hasToolCalls = Array.isArray(body?.message?.toolCalls);
-  console.log(`📨 Incoming Vapi webhook: message.type="${msgType}" toolCallList=${hasToolCallList} toolCalls=${hasToolCalls}`);
-  if (msgType === "tool-calls" || hasToolCalls || hasToolCallList) {
-    console.log("   Full message:", JSON.stringify(body.message, null, 2).slice(0, 1500));
+  // Log incoming Vapi payload shape — gated behind DEBUG=1 (loud per request)
+  if (DEBUG) {
+    const body = request.body as any;
+    const msgType = body?.message?.type ?? "<no message.type>";
+    const hasToolCallList = Array.isArray(body?.message?.toolCallList);
+    const hasToolCalls = Array.isArray(body?.message?.toolCalls);
+    console.log(`📨 Incoming Vapi webhook: message.type="${msgType}" toolCallList=${hasToolCallList} toolCalls=${hasToolCalls}`);
+    if (msgType === "tool-calls" || hasToolCalls || hasToolCallList) {
+      console.log("   Full message:", JSON.stringify(body.message, null, 2).slice(0, 1500));
+    }
   }
 
   // Validate body structure

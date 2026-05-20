@@ -25,6 +25,7 @@ Reference agents here span TypeScript and Python and cover every GA component of
 | [langchain-agent](./langchain-agent/) | Python | LangChain | Wallet · Secured credit · x402 | |
 | [crewai-demo](./crewai-demo/) | Python | CrewAI (via MCP) | Wallet · Secured credit | |
 | [openai-agents](./openai-agents/) | TypeScript | OpenAI Agents SDK | Wallet · Secured credit · x402 | `Preview` — MCP fallback |
+| [vapi-voice-agent](./vapi-voice-agent/) | TypeScript | Vapi + GPT-4o + ElevenLabs | x402 (voice agent tool calls) | `New` |
 
 ---
 
@@ -40,6 +41,7 @@ Reference agents here span TypeScript and Python and cover every GA component of
 | Want to call x402 APIs from your own framework | [`x402-client/`](./x402-client/) |
 | Are building a yield/treasury agent | [`yield-optimizer/`](./yield-optimizer/) |
 | Are arbitraging on-chain markets | [`flash-arb-bot/`](./flash-arb-bot/) |
+| Are building a Vapi voice agent | [`vapi-voice-agent/`](./vapi-voice-agent/) |
 
 ---
 
@@ -51,7 +53,7 @@ Reference agents here span TypeScript and Python and cover every GA component of
 | 02 | Fiat on-ramp | `GA` (dashboard-driven) | `financial-os-loop` shows the deep link |
 | 03 | Secured working capital | `GA` | `financial-os-loop`, `agentkit-ts-chatbot`, `yield-optimizer`, `langchain-agent`, `crewai-demo`, `openai-agents` |
 | 04 | Unsecured working capital | `Preview` | Email [hello@floelabs.xyz](mailto:hello@floelabs.xyz) for the design partner program |
-| 05 | x402 payment facilitator | `GA` | `financial-os-loop`, `agentkit-ts-chatbot`, `x402-client`, `langchain-agent`, `openai-agents` |
+| 05 | x402 payment facilitator | `GA` | `financial-os-loop`, `agentkit-ts-chatbot`, `x402-client`, `langchain-agent`, `openai-agents`, `vapi-voice-agent` |
 | 06 | Credit & trust bureau | Reader `Beta` · Writer `Preview` | `financial-os-loop` registers a credit threshold |
 
 ---
