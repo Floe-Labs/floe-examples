@@ -34,7 +34,6 @@ Both demos talk to a **live Floe API + facilitator** and a **funded credit key**
 | `OPENAI_API_KEY` | `loop_kill.py` | Upstream provider key, passed through to the proxy (`X-Floe-Provider-Key`). Floe stores none. |
 | `FLOE_LLM_MODEL` | `loop_kill.py` | Optional model override (default `openai/gpt-4o`). |
 | `FLOE_DEMO_HOST_A_URL` / `_B_URL` / `_OFFLIST_URL` | `procurement_crew.py` | Real x402-gated endpoints (A/B allowlisted; offlist not). |
-| `RESEARCHER_PRIVATE_KEY` / `BUYER_PRIVATE_KEY` / `MANAGER_PRIVATE_KEY` | `procurement_crew.py` | Optional per-agent funded keys for true budget isolation (see below). |
 
 ## Run
 
@@ -47,7 +46,7 @@ Without the required env vars set, each script prints exactly what it needs and 
 
 ## Per-agent budget isolation (procurement demo)
 
-Each `FloeBudget` is provisioned against a wallet. For three genuinely independent budgets, give each agent its own funded key (`RESEARCHER_PRIVATE_KEY`, etc.). If you only set `PRIVATE_KEY`, all three resolve to the **same** on-chain agent and the last `provision()` wins — the budgets collide. That is fine for eyeballing the API; it is not real isolation. The Buyer's allowlist/overspend behaviour (the point of the demo) is exercised on the Buyer's wallet either way.
+All three agents share a single `PRIVATE_KEY` wallet — no per-role keys. `budget_enabled_agent` provisions a **distinct Floe managed agent** (its own credit line) per call, so the $1 / $5 / $0 budgets are isolated even under one wallet. Floe caps managed agents at **5 per developer**, so a crew can have up to 5 budgeted agents.
 
 ## How enforcement works (the honest version)
 

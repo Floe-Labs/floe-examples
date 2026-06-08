@@ -16,17 +16,15 @@ What this proves (all enforced server-side, not by the agent behaving):
 
 A per-agent spend ledger is printed from the crew's `step_callback`.
 
-Single-wallet caveat (important, honest)
-----------------------------------------
-Each FloeBudget is provisioned against *a wallet*. To get three genuinely
-independent budgets you must give each agent its own funded key
-(`RESEARCHER_PRIVATE_KEY`, `BUYER_PRIVATE_KEY`, `MANAGER_PRIVATE_KEY`). If you
-only set `PRIVATE_KEY`, all three resolve to the SAME on-chain agent and the last
-`provision()` wins — the budgets collide. That is fine for eyeballing the API
-surface, but it is NOT real per-agent isolation. The Buyer's allowlist/overspend
-behaviour (the point of this demo) is exercised on the Buyer's wallet regardless.
+One wallet, three isolated budgets
+----------------------------------
+All three agents share a single `PRIVATE_KEY` wallet. `budget_enabled_agent`
+provisions a DISTINCT Floe managed agent (its own credit line) per call, so the
+$1 / $5 / $0 budgets are isolated even under one wallet — no per-role keys
+needed. (Floe caps managed agents at 5 per developer, so a crew can have up to
+5 budgeted agents.)
 
-Requires a live Floe API and funded credit key(s), plus real x402-gated endpoints
+Requires a live Floe API and a funded credit key, plus real x402-gated endpoints
 for hostA / hostB / the off-allowlist host. This script does not mock anything;
 without live creds it prints what it needs and exits.
 """
@@ -53,7 +51,7 @@ _COST_RE = re.compile(r"\$([0-9]+\.[0-9]+)\s*USDC")
 
 def _require_env() -> dict[str, str] | None:
     required = {
-        "PRIVATE_KEY": "Wallet private key (0x...) — funds the Buyer (and any agent without its own key).",
+        "PRIVATE_KEY": "Wallet private key (0x...) — the crew's funded wallet; one managed agent is provisioned per role under it.",
         "FLOE_FACILITATOR_API_KEY": "Floe credit key (floe_...). Auths the facilitator + debits the credit line.",
     }
     missing = [k for k in required if not os.getenv(k)]
@@ -87,6 +85,7 @@ def _require_env() -> dict[str, str] | None:
         )
         return None
     return {
+        "private_key": os.environ["PRIVATE_KEY"],
         "floe_key": os.environ["FLOE_FACILITATOR_API_KEY"],
         "api_base": os.getenv("FLOE_API_BASE_URL", "https://credit-api.floelabs.xyz").rstrip("/"),
         "chain_id": os.getenv("CHAIN_ID", "8453"),  # Base mainnet
@@ -94,11 +93,6 @@ def _require_env() -> dict[str, str] | None:
         "host_b_url": host_b,
         "offlist_url": off,
     }
-
-
-def _agent_key(role_env: str) -> str | None:
-    """Per-role private key, falling back to the shared PRIVATE_KEY."""
-    return os.getenv(role_env) or os.getenv("PRIVATE_KEY")
 
 
 def _build_wallet_provider(private_key: str, chain_id: str):
@@ -208,25 +202,29 @@ def main() -> int:
     def x402_cfg(name: str) -> X402Config:
         return X402Config(facilitator_url=api_base, facilitator_api_key=floe_key, agent_name=name)
 
+    # One funded wallet for the whole crew. budget_enabled_agent provisions a
+    # DISTINCT managed agent (its own credit line) per call, so the three budgets
+    # below are isolated even though they share this wallet.
+    wallet_provider = _build_wallet_provider(env["private_key"], env["chain_id"])
+
     # ── Researcher: $1, allow-any vendor ──────────────────────────────────────
     researcher = budget_enabled_agent(
         role="Researcher",
         goal="Identify which dataset vendor the Buyer should purchase from",
         backstory="A frugal analyst on a tight $1 budget.",
         budget=FloeBudget(usd_limit=1.0),
-        wallet_provider=_build_wallet_provider(_agent_key("RESEARCHER_PRIVATE_KEY"), env["chain_id"]),
+        wallet_provider=wallet_provider,
         x402_config=x402_cfg("procurement-researcher"),
         step_callback=_make_step_callback("Researcher"),
     )
 
     # ── Buyer: $5, allowlist host A ($2) + host B ($1) ────────────────────────
-    buyer_wallet = _build_wallet_provider(_agent_key("BUYER_PRIVATE_KEY"), env["chain_id"])
     buyer = budget_enabled_agent(
         role="Buyer",
         goal="Purchase the approved dataset from an allowlisted vendor, within budget",
         backstory="A procurement agent that may only pay vendors on the approved allowlist.",
         budget=FloeBudget(usd_limit=5.0, allow={host_a: "2", host_b: "1"}),
-        wallet_provider=buyer_wallet,
+        wallet_provider=wallet_provider,
         x402_config=x402_cfg("procurement-buyer"),
         step_callback=_make_step_callback("Buyer"),
     )
@@ -236,16 +234,14 @@ def main() -> int:
     )
 
     # ── Manager: $0, cannot spend ─────────────────────────────────────────────
-    # NOTE: usd_limit must be > 0 — provision() converts to raw USDC and rejects
-    # non-positive caps. A "$0, cannot spend" Manager is therefore modelled as the
-    # smallest representable cap (1 raw unit = $0.000001), which blocks any real
-    # paid call in practice.
+    # A hard zero-spend role: FloeBudget(usd_limit=0) creates no credit line and no
+    # managed agent, so any paid call fails closed server-side. A pure coordinator.
     manager = budget_enabled_agent(
         role="Manager",
         goal="Review the purchase and confirm it stayed within policy",
-        backstory="A coordinator with an effectively-$0 budget — reviews, never spends.",
-        budget=FloeBudget(usd_limit=0.000001),
-        wallet_provider=_build_wallet_provider(_agent_key("MANAGER_PRIVATE_KEY"), env["chain_id"]),
+        backstory="A coordinator with a $0 budget — reviews, never spends.",
+        budget=FloeBudget(usd_limit=0),
+        wallet_provider=wallet_provider,
         x402_config=x402_cfg("procurement-manager"),
         step_callback=_make_step_callback("Manager"),
     )
