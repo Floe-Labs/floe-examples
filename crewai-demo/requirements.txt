@@ -1,5 +1,15 @@
+# crewai-floe is the budget-enabled CrewAI integration. Until agentkit-actions-py
+# PR #27 (feat/crewai-integration) is published to PyPI, install it from the branch:
+#
+#   pip install "git+https://github.com/Floe-Labs/agentkit-actions-py.git@feat/crewai-integration#subdirectory=crewai-floe"
+#
+# That pulls in floe-agentkit-actions (with the [crewai] extra) and crewai. Once
+# #27 is merged + released, replace the line below with: crewai-floe>=0.1.0
+crewai-floe @ git+https://github.com/Floe-Labs/agentkit-actions-py.git@feat/crewai-integration#subdirectory=crewai-floe
+
+# Pulled in transitively by crewai-floe, pinned here for clarity:
 floe-agentkit-actions>=0.2.0
 coinbase-agentkit>=0.7.0
 crewai>=0.30.0
-crewai-tools>=0.4.0
+eth-account>=0.13.0
 python-dotenv>=1.0.0
