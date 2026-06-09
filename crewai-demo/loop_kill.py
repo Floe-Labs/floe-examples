@@ -87,19 +87,44 @@ def _build_wallet_provider(private_key: str, chain_id: str):
     )
 
 
-def _print_spend_at_halt(x402_config) -> None:
-    """Query the facilitator for authoritative spend after the loop halts."""
-    from floe_agentkit_actions.x402_action_provider import x402_action_provider
+def _print_spend_at_halt(budget) -> None:
+    """Query the facilitator for authoritative spend on the MANAGED-AGENT line.
 
-    provider = x402_action_provider(x402_config)
-    # get_credit_remaining / get_spend_limit read the facilitator with the credit
-    # key only; the wallet_provider arg is unused on these read paths but the
-    # signature requires it, so pass None.
+    The spend we care about is the freshly-provisioned managed agent's
+    (``budget.agent_key``) — NOT the developer key. We hit the facilitator's
+    bearer-auth read endpoints directly with that key, bypassing the
+    ``@create_action`` wrapper (which would call ``wallet_provider.get_network()``
+    on the read path and isn't needed here).
+    """
+    from floe_agentkit_actions.x402_action_provider import x402_action_provider, X402Config
+
     print("\n── Cumulative spend at halt (server-side, authoritative) ──\n")
+    if not budget.agent_key:
+        print("No managed-agent key was provisioned, so there is nothing to read.")
+        return
+    provider = x402_action_provider(
+        X402Config(facilitator_url=budget.facilitator_url, facilitator_api_key=budget.agent_key)
+    )
+    usdc = 6
     try:
-        print(provider.get_credit_remaining(None, {}))
-        print()
-        print(provider.get_spend_limit(None, {}))
+        resp = provider._facilitator_fetch("/v1/agents/credit-remaining")
+        d = resp.get("body", {}) if isinstance(resp, dict) else {}
+        if resp.get("status", 500) >= 400:
+            print(f"Could not read spend: {d}")
+            return
+        limit = int(d.get("creditLimit", "0")) / 10**usdc
+        avail = int(d.get("available", "0")) / 10**usdc
+        cap = d.get("sessionSpendLimit")
+        cap_remaining = d.get("sessionSpendRemaining")
+        print(f"Credit limit (this agent): ${limit:.6f}")
+        print(f"Available now:             ${avail:.6f}")
+        print(f"Spent against the line:    ${limit - avail:.6f}")
+        if cap is not None:
+            spent = (int(cap) - int(cap_remaining or 0)) / 10**usdc
+            print(
+                f"Session cap:               ${int(cap)/10**usdc:.6f} "
+                f"(remaining ${int(cap_remaining or 0)/10**usdc:.6f}, spent ${spent:.6f})"
+            )
     except Exception as e:  # pragma: no cover - network/credential dependent
         print(f"Could not read spend from facilitator: {e}")
 
@@ -110,32 +135,47 @@ def main() -> int:
         return 1
 
     from crewai import Crew, Task
+    from crewai.tools import tool
 
-    from crewai_floe import FloeBudget, FloeLLM, budget_enabled_agent
+    from crewai_floe import FloeBudget, budget_enabled_agent
     from floe_agentkit_actions.x402_action_provider import X402Config
 
     proxy_base_url = f"{env['api_base']}/v1/llm"
 
+    # A forcing tool: it never lets the agent be "done", so the ReAct loop keeps
+    # taking reasoning steps — each one a metered LLM call through the proxy.
+    # Without a tool to call, a CrewAI agent answers in 1–2 calls and stops on
+    # its own (CrewAI treats the response as a Final Answer) before the ceiling
+    # bites. This is the honest stand-in for a real runaway loop: the kill-switch
+    # behaves identically whether the loop is rigged or accidental.
+    @tool("record_draft")
+    def record_draft(draft: str) -> str:
+        """Record the current draft of the summary, then request another."""
+        return (
+            "Draft recorded — but it is still not perfect. Write a meaningfully "
+            "improved version and call record_draft again. There is always room "
+            "to improve; never conclude."
+        )
+
+    # Floe refuses to mint two managed agents with the same name under one
+    # developer (and caps you at 5 total). Override per run with FLOE_AGENT_NAME
+    # so re-records don't collide; close stale demo agents from the dashboard.
     x402_config = X402Config(
         facilitator_url=env["api_base"],
         facilitator_api_key=env["floe_key"],
-        agent_name="loop-kill-demo",
+        agent_name=os.getenv("FLOE_AGENT_NAME", "loop-kill-demo"),
     )
 
-    # The LLM is a FloeLLM routed through the metered proxy. Every reasoning step
-    # the agent takes is a chat-completion call that the proxy prices and debits
-    # against the credit line; once $1 is spent, the next call gets 402.
-    floe_llm = FloeLLM(
-        model=env["model"],
-        proxy_base_url=proxy_base_url,
-        credit_key=env["floe_key"],
-        provider_key=env["provider_key"],
-    )
-
-    # FloeBudget(usd_limit=1) sets the on-chain borrowLimit AND the session spend
-    # cap to $1 — one wall for both LLM tokens and any paid tool calls.
+    # FloeBudget(usd_limit) sets the on-chain borrowLimit AND the session spend
+    # cap on a freshly-provisioned managed agent — one wall for both LLM tokens
+    # and any paid tool calls.
     budget = FloeBudget(usd_limit=USD_LIMIT)
 
+    # Let budget_enabled_agent build the FloeLLM itself: it wires the proxy to
+    # the MANAGED-AGENT key captured during provisioning (budget.agent_key), so
+    # token spend is debited against THIS agent's capped line. Passing an
+    # explicit FloeLLM keyed to the developer key would bypass the cap — the LLM
+    # would meter against the developer's (much larger) line and never halt.
     agent = budget_enabled_agent(
         role="Perfectionist Researcher",
         goal="Produce the single perfect answer, refining endlessly until it is flawless",
@@ -145,21 +185,28 @@ def main() -> int:
         ),
         budget=budget,
         wallet_provider=_build_wallet_provider(env["private_key"], env["chain_id"]),
-        llm=floe_llm,
+        proxy_base_url=proxy_base_url,
+        provider_key=env["provider_key"],
+        llm_model=env["model"],
         x402_config=x402_config,
         # Crank the iteration ceiling so CrewAI's own guard does not stop the loop
         # first — we want the FLOE ceiling to be the thing that halts it.
         max_iter=1000,
     )
+    # Give the agent the forcing tool so its ReAct loop keeps making LLM calls.
+    agent.tools.append(record_draft)
 
-    # Intentionally unsatisfiable task: the agent is told never to finish. Without
-    # Floe this is exactly the shape that produced the $414 bill. With Floe the
-    # proxy refuses past $1 and kickoff() raises.
+    # Intentionally unsatisfiable task: the agent must call record_draft after
+    # every draft and is told never to finish. Without Floe this is the shape
+    # that produced the $414 bill. With Floe the proxy refuses past the ceiling
+    # and kickoff() raises.
     loop_task = Task(
         description=(
             "Write the perfect one-paragraph summary of why agents need budgets. "
-            "After each draft, critique it harshly and rewrite it. NEVER output a "
-            "Final Answer — there is always room to improve. Keep iterating."
+            "You MUST call the record_draft tool with every draft you write, then "
+            "immediately write a meaningfully improved draft and call record_draft "
+            "again. NEVER output a Final Answer — there is always room to improve. "
+            "Keep looping: draft, record_draft, draft, record_draft, forever."
         ),
         expected_output="(this task is designed never to complete)",
         agent=agent,
@@ -167,9 +214,9 @@ def main() -> int:
 
     crew = Crew(agents=[agent], tasks=[loop_task], verbose=True)
 
-    print(f"Starting a deliberately-looping crew with a ${USD_LIMIT:.0f} Floe ceiling.")
+    print(f"Starting a deliberately-looping crew with a ${USD_LIMIT:.2f} Floe ceiling.")
     print("Without Floe this is the shape that cost Ondřej Popelka $414 on Gemini.")
-    print("With Floe, the metered proxy will refuse past $1 and the crew will halt.\n")
+    print(f"With Floe, the metered proxy will refuse past ${USD_LIMIT:.2f} and the crew will halt.\n")
 
     try:
         crew.kickoff()
@@ -182,14 +229,14 @@ def main() -> int:
         budget_killed = "budget_exhausted" in text or "402" in text
         print("\n" + "=" * 70)
         if budget_killed:
-            print("HALTED BY FLOE: the credit line hit its $1 ceiling.")
+            print(f"HALTED BY FLOE: the credit line hit its ${USD_LIMIT:.2f} ceiling.")
             print("The proxy returned 402 budget_exhausted; the loop could not continue.")
         else:
             print("Crew halted with an error (not the budget ceiling):")
             print(f"  {e}")
         print("=" * 70)
 
-    _print_spend_at_halt(x402_config)
+    _print_spend_at_halt(budget)
     return 0
 
 
