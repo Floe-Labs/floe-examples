@@ -7,7 +7,7 @@ under 5 minutes. TypeScript and Python. Walletless. No crypto required.
 
 ---
 
-Floe is the spend layer for AI agents: your agent pays across 13,000+ x402 APIs
+Floe is the spend layer for AI agents: your agent pays across 2,000+ vendor APIs
 through one endpoint, governed by programmable, context-aware budgets — no
 per-vendor accounts, no wallet, no crypto. These examples show it working in real
 frameworks.
@@ -90,7 +90,7 @@ The pattern every live example follows:
 Setup    register an agent + wallet (ERC-8004 identity, spend limits)
 Fund     USDC in via card / bank / Apple Pay / Google Pay — or on-chain
 Budget   set per-call, daily, and session spend caps; allowed destinations
-Spend    x402_fetch any of 13,000+ APIs through the Floe proxy
+Spend    x402_fetch any of 2,000+ APIs through the Floe proxy
 Reason   estimate_x402_cost before paying; the agent stays inside its budget
 See      every call is a typed receipt — reconcile, alert, or revoke
 ```
