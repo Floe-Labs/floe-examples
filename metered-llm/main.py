@@ -12,7 +12,10 @@ Env:  FLOE_API_KEY, PROVIDER_API_KEY  (optional: FLOE_MODEL)
 import os
 import sys
 
-from openai import OpenAI
+from dotenv import load_dotenv
+from openai import APIStatusError, OpenAI
+
+load_dotenv()  # load .env so `cp .env.example .env` just works
 
 
 def require_env(name: str) -> str:
@@ -33,14 +36,24 @@ client = OpenAI(
 
 model = os.environ.get("FLOE_MODEL", "gpt-5.5")  # or claude-opus-4-8, claude-sonnet-4-6 — any priced model
 
-resp = client.chat.completions.with_raw_response.create(
-    model=model,
-    messages=[{"role": "user", "content": "In one sentence: what is an AI agent?"}],
-)
-completion = resp.parse()
-print(f"\n{model} → {completion.choices[0].message.content}")
-print(f"metered cost (USDC): {resp.headers.get('x-floe-cost-usdc')}")
-print(
-    "\nTip: set a session spend cap (set_spend_limit) — calls past your budget "
-    "are refused server-side, not billed."
-)
+try:
+    resp = client.chat.completions.with_raw_response.create(
+        model=model,
+        messages=[{"role": "user", "content": "In one sentence: what is an AI agent?"}],
+    )
+    completion = resp.parse()
+    print(f"\n{model} → {completion.choices[0].message.content}")
+    print(f"metered cost (USDC): {resp.headers.get('x-floe-cost-usdc')}")
+    print(
+        "\nTip: set a session spend cap (set_spend_limit) — calls past your budget "
+        "are refused server-side, not billed."
+    )
+except APIStatusError as err:
+    # A 402 means Floe refused the call server-side — budget/credit line exhausted,
+    # nothing billed. That's the spend cap doing its job.
+    if err.status_code == 402:
+        sys.exit(
+            "\n402 — budget cap reached. Floe refused this call server-side "
+            "(not billed). Raise your spend limit or credit line."
+        )
+    sys.exit(f"\nLLM call failed ({err.status_code}): {err}")

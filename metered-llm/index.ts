@@ -9,6 +9,7 @@
  * Run:  npm install && npm start
  * Env:  FLOE_API_KEY, PROVIDER_API_KEY  (optional: FLOE_MODEL)
  */
+import "dotenv/config"; // load .env so `cp .env.example .env` just works
 import OpenAI from "openai";
 
 function requireEnv(name: string): string {
@@ -35,16 +36,27 @@ const client = new OpenAI({
 // Any priced model works — swap freely (and swap PROVIDER_API_KEY to match).
 const model = process.env.FLOE_MODEL ?? "gpt-5.5"; // e.g. "claude-opus-4-8", "claude-sonnet-4-6"
 
-const { data, response } = await client.chat.completions
-  .create({
-    model,
-    messages: [{ role: "user", content: "In one sentence: what is an AI agent?" }],
-  })
-  .withResponse();
+try {
+  const { data, response } = await client.chat.completions
+    .create({
+      model,
+      messages: [{ role: "user", content: "In one sentence: what is an AI agent?" }],
+    })
+    .withResponse();
 
-console.log(`\n${model} → ${data.choices[0]?.message?.content ?? ""}`);
-// Floe stamps the metered cost on every response.
-console.log(`metered cost (USDC): ${response.headers.get("x-floe-cost-usdc")}`);
-console.log(
-  "\nTip: set a session spend cap (set_spend_limit) — calls past your budget are refused server-side, not billed.",
-);
+  console.log(`\n${model} → ${data.choices[0]?.message?.content ?? ""}`);
+  // Floe stamps the metered cost on every response.
+  console.log(`metered cost (USDC): ${response.headers.get("x-floe-cost-usdc")}`);
+  console.log(
+    "\nTip: set a session spend cap (set_spend_limit) — calls past your budget are refused server-side, not billed.",
+  );
+} catch (err) {
+  // The server-side cap is the point of the demo: a 402 means Floe refused the
+  // call before paying — your budget/credit line is exhausted, nothing was billed.
+  if (err instanceof OpenAI.APIError && err.status === 402) {
+    console.error("\n402 — budget cap reached. Floe refused this call server-side (not billed). Raise your spend limit or credit line.");
+  } else {
+    console.error("\nLLM call failed:", err instanceof Error ? err.message : err);
+  }
+  process.exit(1);
+}

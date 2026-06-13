@@ -12,7 +12,7 @@ Floe. (For the budget-aware "$1-not-$414 loop kill", see [`../crewai-demo`](../c
 
 | | |
 |---|---|
-| Endpoint | `https://credit-api.floelabs.xyz/v1/llm/chat/completions` (OpenAI-compatible; `/embeddings` too) |
+| Base URL | `https://credit-api.floelabs.xyz/v1/llm` — set this as the SDK `baseURL`/`base_url`; the client appends `/chat/completions` (and `/embeddings`) |
 | `Authorization: Bearer` | your Floe agent key `floe_<hex>` — auth + billing identity |
 | `X-Floe-Provider-Key` | your OpenAI/Anthropic key — passed through to the provider, **never stored** |
 | `model` (in body) | **any** priced model: `gpt-5.5`, `claude-opus-4-8`, `claude-sonnet-4-6`, `gpt-5.4-mini`, … |

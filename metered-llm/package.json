@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": { "start": "tsx index.ts" },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "openai": "^4.0.0"
   },
   "devDependencies": { "tsx": "^4.0.0" }
