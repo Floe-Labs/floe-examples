@@ -90,7 +90,7 @@ The pattern every live example follows:
 Setup    register an agent + wallet (ERC-8004 identity, spend limits)
 Fund     USDC in via card / bank / Apple Pay / Google Pay — or on-chain
 Budget   set per-call, daily, and session spend caps; allowed destinations
-Spend    x402_fetch any of 2,000+ APIs through the Floe proxy
+Spend    x402_fetch any of 2,000+ vendor API services through the Floe proxy
 Reason   estimate_x402_cost before paying; the agent stays inside its budget
 See      every call is a typed receipt — reconcile, alert, or revoke
 ```

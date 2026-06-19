@@ -132,7 +132,7 @@ To add a new x402 API as a tool:
 2. Create the tool in the Vapi dashboard (or via the API) and attach it to your assistant
 3. Restart the server
 
-Any of the [13,000+ x402 APIs reachable via the Floe proxy](https://floe-labs.gitbook.io/docs/x402-directory) work — just add the URL.
+Any of the [2,000+ vendor API services reachable via the Floe proxy](https://floe-labs.gitbook.io/docs/x402-directory) work — just add the URL.
 
 ## Security
 
