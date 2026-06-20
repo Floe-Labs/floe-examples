@@ -32,6 +32,15 @@ if (!FLOE_API_KEY) {
   process.exit(1);
 }
 
+// The cap must be a positive integer (USDC base units) or we'd silently misconfigure
+// the demo — fail fast with a clear message.
+if (!/^\d+$/.test(FLOE_SPEND_LIMIT_RAW) || Number(FLOE_SPEND_LIMIT_RAW) <= 0) {
+  console.error(
+    `FLOE_SPEND_LIMIT_RAW must be a positive integer in USDC base units (e.g. 50000 = $0.05). Got: "${FLOE_SPEND_LIMIT_RAW}"`
+  );
+  process.exit(1);
+}
+
 const vapi = new VapiClient({ token: VAPI_API_KEY });
 const toolCallUrl = `${SERVER_URL}/vapi/tool-call`;
 const spendCapUsd = Number(FLOE_SPEND_LIMIT_RAW) / 1e6;
@@ -54,6 +63,34 @@ BUDGET — read this carefully:
 
 async function main() {
   console.log("🎙️  Setting up Vapi assistant...\n");
+
+  // Step 0: Set the Floe session spend-limit FIRST and FAIL CLOSED. This is the
+  // hard cap the whole demo is about — if we can't set it, abort before creating
+  // any Vapi resources so we never run an uncapped "spend-governed" agent.
+  console.log(`💵 Setting Floe session spend-limit...`);
+  try {
+    const res = await fetch(`${FLOE_CREDIT_API}/v1/agents/spend-limit`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${FLOE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ limitRaw: FLOE_SPEND_LIMIT_RAW }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`   ❌ Could not set spend-limit (${res.status}): ${body.slice(0, 200)}`);
+      console.error(`      Aborting — refusing to create an uncapped agent. Check FLOE_API_KEY and that the agent is funded, then re-run.`);
+      process.exit(1);
+    }
+    console.log(
+      `   ✅ Spend-limit set: ${FLOE_SPEND_LIMIT_RAW} base units = $${spendCapUsd.toFixed(3)} for this session\n`
+    );
+  } catch (err) {
+    console.error(`   ❌ Spend-limit request failed: ${(err as Error).message}`);
+    console.error(`      Aborting — refusing to create an uncapped agent. Is credit-api reachable? Then re-run.`);
+    process.exit(1);
+  }
 
   // Step 1: Create custom tools
   console.log("📦 Creating tools...");
@@ -125,40 +162,6 @@ async function main() {
   });
 
   console.log(`   ✅ Assistant created: ${assistant.name} (${assistant.id})`);
-
-  // Step 3: Set a LOW session spend-limit so the cap is reachable in a short demo call.
-  // This is the hard cap enforced by Floe — when exceeded, the proxy denies the paid call.
-  console.log(`\n💵 Setting Floe session spend-limit...`);
-  try {
-    const res = await fetch(`${FLOE_CREDIT_API}/v1/agents/spend-limit`, {
-      method: "PUT",
-      headers: {
-        Authorization: `Bearer ${FLOE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ limitRaw: FLOE_SPEND_LIMIT_RAW }),
-    });
-    if (res.ok) {
-      console.log(
-        `   ✅ Spend-limit set: ${FLOE_SPEND_LIMIT_RAW} base units = $${spendCapUsd.toFixed(3)} for this session`
-      );
-    } else {
-      const body = await res.text();
-      console.warn(
-        `   ⚠️  Could not set spend-limit (${res.status}): ${body.slice(0, 200)}`
-      );
-      console.warn(`      The assistant was still created. Set the cap manually before the demo:`);
-      console.warn(
-        `      curl -X PUT -H "Authorization: Bearer $FLOE_API_KEY" -H "Content-Type: application/json" \\`
-      );
-      console.warn(
-        `        -d '{"limitRaw":"${FLOE_SPEND_LIMIT_RAW}"}' ${FLOE_CREDIT_API}/v1/agents/spend-limit`
-      );
-    }
-  } catch (err) {
-    console.warn(`   ⚠️  Spend-limit request failed: ${(err as Error).message}`);
-    console.warn(`      The assistant was still created. Set the cap manually before the demo.`);
-  }
 
   console.log(`\n📝 Add this to your .env so the web widget and budget logic can use it:`);
   console.log(`   VAPI_ASSISTANT_ID=${assistant.id}`);

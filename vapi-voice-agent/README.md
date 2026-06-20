@@ -142,14 +142,14 @@ After each Floe proxy call, `server.ts`:
    ```
 
    The model *sees* this in the tool output and adapts. That's the taper — no extra plumbing into Vapi required.
-4. If the proxy returns a **non-2xx** (cap reached / policy block — 402, 403, or any non-OK), the call is treated as **payment blocked** and the result becomes a hard-stop instruction:
+4. If the proxy returns **402 or 403** (cap reached / policy block), the call is treated as **payment blocked** and the result becomes a hard-stop instruction:
 
    ```text
    Payment blocked — the agent has reached its Floe spending limit ($0.050).
    Tell the caller you've hit your budget and cannot make any more paid lookups on this call.
    ```
 
-   The system prompt instructs the agent to say this plainly and stop retrying — that's the audible hard-stop.
+   The system prompt instructs the agent to say this plainly and stop retrying — that's the audible hard-stop. **Any other non-2xx** (upstream 5xx, timeout) is reported as a temporary *data-source* failure, **not** a budget hit, so the agent doesn't falsely claim you're out of money.
 
 The in-process total is just for the *advisory* line the model reads; the **real** enforcement is Floe's session spend-limit. Even if the model ignored the taper, the cap still blocks the call.
 

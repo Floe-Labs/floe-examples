@@ -27,10 +27,12 @@ const PORT = parseInt(process.env.PORT || "3000", 10);
 const FETCH_TIMEOUT_MS = 15_000;
 const DEBUG = process.env.DEBUG === "1";
 
-// In-process cumulative spend for THIS server run. This is not the enforcer (Floe's
-// session spend-limit is) — it just lets us show the model how much budget it has used
-// so it can taper. Resets when the server restarts.
-let cumulativeSpendUsd = 0;
+// In-process cumulative spend, keyed by Vapi call id, so concurrent callers (phone
+// + web widget) don't pollute each other's budget line. This is NOT the enforcer —
+// Floe's per-agent session spend-limit is the real, server-side hard cap. This map
+// only feeds the advisory line the model reads to taper. Entries are demo-scoped
+// (cleared on server restart); fine for a single-session demo.
+const spendByCall = new Map<string, number>();
 
 if (!FLOE_API_KEY) {
   console.error("Set FLOE_API_KEY in .env");
@@ -170,11 +172,11 @@ async function callViaFloe(
 // Build the short budget line appended to each successful tool result so the model
 // "sees" its remaining budget and can taper. Prefers the proxy's near-limit advisory
 // signal when present; otherwise derives proximity from cumulative spend vs the cap.
-function budgetLine(advisory: BudgetAdvisory | null): string {
-  const used = cumulativeSpendUsd.toFixed(3);
+function budgetLine(spentUsd: number, advisory: BudgetAdvisory | null): string {
+  const used = spentUsd.toFixed(3);
   const cap = SPEND_CAP_USD.toFixed(3);
 
-  let nearLimit = SPEND_CAP_USD > 0 && cumulativeSpendUsd >= SPEND_CAP_USD * 0.8;
+  let nearLimit = SPEND_CAP_USD > 0 && spentUsd >= SPEND_CAP_USD * 0.8;
   if (advisory) {
     if (typeof advisory.near_limit === "boolean") {
       nearLimit = advisory.near_limit;
@@ -203,6 +205,7 @@ interface VapiToolCallBody {
   message: {
     type: string;
     toolCallList: VapiToolCall[];
+    call?: { id?: string }; // the call that triggered this — used to scope spend per caller
   };
 }
 
@@ -251,6 +254,10 @@ app.post("/vapi/tool-call", async (request, reply) => {
   if (message.type !== "tool-calls") {
     return { results: [] };
   }
+
+  // Scope spend to this caller's Vapi call id so concurrent callers don't share a
+  // budget line. Falls back to a single bucket if the payload omits the call id.
+  const callId = message.call?.id ?? "default";
 
   const results = [];
 
@@ -329,16 +336,15 @@ app.post("/vapi/tool-call", async (request, reply) => {
         continue;
       }
 
-      // Settled call: add its cost to the running total, then append the budget line
-      // so the model sees how much it has spent and can taper.
-      if (call_.costUsd !== null) {
-        cumulativeSpendUsd += call_.costUsd;
-      }
-      const result = call_.text + budgetLine(call_.advisory);
+      // Settled call: add its cost to THIS caller's running total, then append the
+      // budget line so the model sees how much it has spent and can taper.
+      const spent = (spendByCall.get(callId) ?? 0) + (call_.costUsd ?? 0);
+      spendByCall.set(callId, spent);
+      const result = call_.text + budgetLine(spent, call_.advisory);
 
       console.log(
         `✅ Tool: ${name} (${call.id}) chars=${call_.text.length} ` +
-          `cost=${call_.costUsd ?? "?"} cumulative=$${cumulativeSpendUsd.toFixed(3)}/$${SPEND_CAP_USD.toFixed(3)}`
+          `cost=${call_.costUsd ?? "?"} cumulative=$${spent.toFixed(3)}/$${SPEND_CAP_USD.toFixed(3)}`
       );
       if (DEBUG) {
         console.log(`   args=${JSON.stringify(args)}`);

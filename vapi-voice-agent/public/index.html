@@ -163,7 +163,15 @@
 
       stopBtn.addEventListener("click", async () => {
         if (!vapi) return;
-        await vapi.stop();
+        try {
+          await vapi.stop();
+        } catch (err) {
+          // Don't leak an unhandled rejection or strand the UI — surface it and
+          // reset controls so the user can recover.
+          setStatus("Could not stop call: " + (err?.message || err), true);
+          stopBtn.disabled = true;
+          talkBtn.disabled = false;
+        }
       });
 
       talkBtn.disabled = true;
