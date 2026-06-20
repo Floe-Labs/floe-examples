@@ -89,7 +89,8 @@ interface BudgetAdvisory {
 }
 
 interface FloeCallResult {
-  blocked: boolean; // proxy denied the paid call (e.g. spend-limit reached)
+  ok: boolean; // the paid call succeeded (2xx)
+  blocked: boolean; // denied for budget/policy reasons (402/403) — drives the hard-stop
   status: number;
   text: string; // upstream body (truncated) on success, or error snippet
   costUsd: number | null; // from X-Floe-Cost-USDC, if present
@@ -137,21 +138,24 @@ async function callViaFloe(
       }
     }
 
-    // Any non-OK proxy response = the paid call was denied (spend-limit reached,
-    // policy block, etc.). Treat it uniformly as "payment blocked".
+    // A 402/403 is a budget/policy denial — that's the hard-stop we want to narrate.
+    // Any other non-OK status (500, 502, timeout upstream) is a real failure, NOT a
+    // budget hit — don't mislead the caller into thinking they're out of money.
     if (!response.ok) {
       const error = await response.text();
       return {
-        blocked: true,
+        ok: false,
+        blocked: response.status === 402 || response.status === 403,
         status: response.status,
         text: error.slice(0, 200),
-        costUsd: null, // a blocked call is not charged
+        costUsd: null, // a denied/failed call is not charged
         advisory,
       };
     }
 
     const body = await response.text();
     return {
+      ok: true,
       blocked: false,
       status: response.status,
       text: body.length > 2000 ? body.slice(0, 2000) + "..." : body,
@@ -305,6 +309,22 @@ app.post("/vapi/tool-call", async (request, reply) => {
             `Payment blocked — the agent has reached its Floe spending limit ` +
             `($${SPEND_CAP_USD.toFixed(3)}). Tell the caller you've hit your budget ` +
             `and cannot make any more paid lookups on this call.`,
+        });
+        continue;
+      }
+
+      // Non-budget failure (upstream 5xx / proxy error): report it honestly as a
+      // data-source problem, NOT as a budget hit, so the agent doesn't falsely
+      // claim the caller is out of money.
+      if (!call_.ok) {
+        console.log(`⚠️  Tool: ${name} (${call.id}) FAILED status=${call_.status} (not a budget block)`);
+        results.push({
+          name,
+          toolCallId: call.id,
+          result:
+            `The lookup failed (status ${call_.status}) — the data source is ` +
+            `temporarily unavailable. This is not a budget issue; tell the caller ` +
+            `you couldn't fetch that right now and offer to try something else.`,
         });
         continue;
       }
