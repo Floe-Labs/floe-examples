@@ -15,8 +15,9 @@ import "dotenv/config";
 const VAPI_API_KEY = process.env.VAPI_API_KEY;
 const SERVER_URL = process.env.SERVER_URL;
 const FLOE_API_KEY = process.env.FLOE_API_KEY;
-// USDC base units (6 decimals): 50000 = $0.05 — low enough to hit in a short demo call.
-const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "50000";
+// USDC base units (6 decimals): 30000 = $0.03 ≈ 6 Exa searches — low enough to
+// hit the hard-stop in a short demo call.
+const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "30000";
 const FLOE_CREDIT_API = process.env.FLOE_CREDIT_API_URL || "https://credit-api.floelabs.xyz";
 
 if (!VAPI_API_KEY) {
@@ -36,7 +37,7 @@ if (!FLOE_API_KEY) {
 // the demo — fail fast with a clear message.
 if (!/^\d+$/.test(FLOE_SPEND_LIMIT_RAW) || Number(FLOE_SPEND_LIMIT_RAW) <= 0) {
   console.error(
-    `FLOE_SPEND_LIMIT_RAW must be a positive integer in USDC base units (e.g. 50000 = $0.05). Got: "${FLOE_SPEND_LIMIT_RAW}"`
+    `FLOE_SPEND_LIMIT_RAW must be a positive integer in USDC base units (e.g. 30000 = $0.03). Got: "${FLOE_SPEND_LIMIT_RAW}"`
   );
   process.exit(1);
 }
@@ -45,15 +46,11 @@ const vapi = new VapiClient({ token: VAPI_API_KEY });
 const toolCallUrl = `${SERVER_URL}/vapi/tool-call`;
 const spendCapUsd = Number(FLOE_SPEND_LIMIT_RAW) / 1e6;
 
-const SYSTEM_PROMPT = `You are a crypto market assistant on a phone call. You have three tools:
-
-1. get_crypto_news — Real-time crypto market news with sentiment and top headlines (Otto AI). Use when the caller asks "what's happening in crypto", market mood, or wants a news rundown.
-2. get_market_price — Live mark price, funding rate, and open interest for a tradable asset (Hyperliquid market data via Otto AI). Use when the caller asks for the price or funding rate of an asset like BTC, ETH, SOL, etc. The required argument is the asset ticker.
-3. get_block_number — Current Base mainnet block height. Use when the caller asks about Base chain activity or wants a sanity check that on-chain queries are live.
+const SYSTEM_PROMPT = `You are a friendly voice concierge on a phone call. When the caller asks something you don't already know — weather, business hours, recommendations, current events, facts — use search_web to look it up and answer conversationally. You have a limited lookup budget; each search costs money. As you approach your budget, be concise and search less. If a search is blocked because you've reached your budget, tell the caller plainly that you've hit your lookup budget for this call and can't search more. Do not retry.
 
 Keep your responses concise and conversational — you're on a phone call, not writing an essay.
-When you use a tool, briefly tell the caller what you're doing ("Let me check the latest news..." or "Pulling BTC's price now...").
-Summarize tool results in 2-3 sentences max.
+When you use a tool, briefly tell the caller what you're doing ("Let me look that up...").
+Summarize search results in 2-3 sentences max.
 
 BUDGET — read this carefully:
 - You have a strict, limited spending budget for this call. Each paid lookup (every tool call) costs real money.
@@ -92,85 +89,55 @@ async function main() {
     process.exit(1);
   }
 
-  // Step 1: Create custom tools
+  // Step 1: Create the web-search tool
   console.log("📦 Creating tools...");
 
-  const cryptoNewsTool = await vapi.tools.create({
+  const searchWebTool = await vapi.tools.create({
     type: "function",
     function: {
-      name: "get_crypto_news",
-      description: "Get real-time crypto market news with sentiment analysis and top headlines (Otto AI). No arguments needed.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
-    },
-    server: { url: toolCallUrl },
-  });
-  console.log(`   ✅ get_crypto_news (${cryptoNewsTool.id})`);
-
-  const marketPriceTool = await vapi.tools.create({
-    type: "function",
-    function: {
-      name: "get_market_price",
-      description: "Get live mark/oracle price, funding rate, open interest, and size specs for a Hyperliquid tradable asset. Pass the asset ticker (e.g. BTC, ETH, SOL).",
+      name: "search_web",
+      description: "Search the live web for an answer (Exa, paid via Floe). Use for anything you don't already know — weather, business hours, recommendations, current events, facts. Pass the caller's question as the query.",
       parameters: {
         type: "object",
         properties: {
-          asset: { type: "string", description: "Asset ticker (BTC, ETH, SOL, etc.)" },
+          query: { type: "string", description: "What to search the web for (the caller's question)." },
         },
-        required: ["asset"],
+        required: ["query"],
       },
     },
     server: { url: toolCallUrl },
   });
-  console.log(`   ✅ get_market_price (${marketPriceTool.id})`);
+  console.log(`   ✅ search_web (${searchWebTool.id})`);
 
-  const blockNumberTool = await vapi.tools.create({
-    type: "function",
-    function: {
-      name: "get_block_number",
-      description: "Get the current Base mainnet block height via eth_blockNumber. No arguments needed.",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
-    },
-    server: { url: toolCallUrl },
-  });
-  console.log(`   ✅ get_block_number (${blockNumberTool.id})`);
-
-  // Step 2: Create assistant with tools attached
+  // Step 2: Create assistant with the tool attached
   console.log("\n🤖 Creating assistant...");
 
   const assistant = await vapi.assistants.create({
-    name: "Floe Crypto Market Assistant",
+    name: "Floe Web Concierge",
     model: {
       provider: "openai",
       model: "gpt-4o",
       messages: [{ role: "system", content: SYSTEM_PROMPT }],
-      toolIds: [cryptoNewsTool.id, marketPriceTool.id, blockNumberTool.id],
+      toolIds: [searchWebTool.id],
     },
     voice: {
       provider: "11labs",
       voiceId: "cgSgspJ2msm6clMCkdW9", // ElevenLabs "Jessica" — swap for any voiceId from the ElevenLabs library
     },
     firstMessage:
-      "Hi! I can pull live crypto news, give you the latest price and funding for an asset like BTC or ETH, or check what block Base is on. What do you want to know?",
+      "Hi! I'm your concierge — ask me anything and I'll look it up for you. What can I help with?",
   });
 
   console.log(`   ✅ Assistant created: ${assistant.name} (${assistant.id})`);
 
-  console.log(`\n📝 Add this to your .env so the web widget and budget logic can use it:`);
+  console.log(`\n📝 Add this to your .env so the outbound call and budget logic can use it:`);
   console.log(`   VAPI_ASSISTANT_ID=${assistant.id}`);
 
   console.log(`\n📞 Next steps:`);
-  console.log(`   1. Start the server:  npx tsx server.ts`);
-  console.log(`   2. Phone: in the Vapi dashboard, assign a phone number to assistant ${assistant.id}, then call it.`);
-  console.log(`   3. Web:   open http://localhost:${process.env.PORT || "3000"}/ and click "Talk to the agent".`);
-  console.log(`            (the web widget needs VAPI_PUBLIC_KEY + VAPI_ASSISTANT_ID in .env)`);
+  console.log(`   1. Start the server:  npx tsx server.ts   (keep ngrok pointed at it)`);
+  console.log(`   2. Set VAPI_PHONE_NUMBER_ID and TARGET_PHONE_NUMBER (+1...) in .env`);
+  console.log(`   3. Place the outbound call: npx tsx call.ts   (the agent calls TARGET_PHONE_NUMBER)`);
+  console.log(`   (Optional) web widget: open http://localhost:${process.env.PORT || "3000"}/ — needs VAPI_PUBLIC_KEY.`);
   console.log(`\n💰 After the call, check your Floe spending:`);
   console.log(
     `   curl -H "Authorization: Bearer $FLOE_API_KEY" \\`
