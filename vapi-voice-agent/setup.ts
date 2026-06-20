@@ -14,6 +14,10 @@ import "dotenv/config";
 
 const VAPI_API_KEY = process.env.VAPI_API_KEY;
 const SERVER_URL = process.env.SERVER_URL;
+const FLOE_API_KEY = process.env.FLOE_API_KEY;
+// USDC base units (6 decimals): 50000 = $0.05 — low enough to hit in a short demo call.
+const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "50000";
+const FLOE_CREDIT_API = process.env.FLOE_CREDIT_API_URL || "https://credit-api.floelabs.xyz";
 
 if (!VAPI_API_KEY) {
   console.error("Set VAPI_API_KEY in .env");
@@ -23,9 +27,23 @@ if (!SERVER_URL) {
   console.error("Set SERVER_URL in .env (your public webhook URL, e.g. ngrok)");
   process.exit(1);
 }
+if (!FLOE_API_KEY) {
+  console.error("Set FLOE_API_KEY in .env (needed to set the session spend-limit)");
+  process.exit(1);
+}
+
+// The cap must be a positive integer (USDC base units) or we'd silently misconfigure
+// the demo — fail fast with a clear message.
+if (!/^\d+$/.test(FLOE_SPEND_LIMIT_RAW) || Number(FLOE_SPEND_LIMIT_RAW) <= 0) {
+  console.error(
+    `FLOE_SPEND_LIMIT_RAW must be a positive integer in USDC base units (e.g. 50000 = $0.05). Got: "${FLOE_SPEND_LIMIT_RAW}"`
+  );
+  process.exit(1);
+}
 
 const vapi = new VapiClient({ token: VAPI_API_KEY });
 const toolCallUrl = `${SERVER_URL}/vapi/tool-call`;
+const spendCapUsd = Number(FLOE_SPEND_LIMIT_RAW) / 1e6;
 
 const SYSTEM_PROMPT = `You are a crypto market assistant on a phone call. You have three tools:
 
@@ -35,10 +53,44 @@ const SYSTEM_PROMPT = `You are a crypto market assistant on a phone call. You ha
 
 Keep your responses concise and conversational — you're on a phone call, not writing an essay.
 When you use a tool, briefly tell the caller what you're doing ("Let me check the latest news..." or "Pulling BTC's price now...").
-Summarize tool results in 2-3 sentences max.`;
+Summarize tool results in 2-3 sentences max.
+
+BUDGET — read this carefully:
+- You have a strict, limited spending budget for this call. Each paid lookup (every tool call) costs real money.
+- After each tool call, the result includes a "[Floe budget: ...]" line showing how much of your budget you've used. Read it every time and let it guide you.
+- As you approach your budget, taper off: give shorter answers, batch what the caller wants, and make fewer and only the most necessary paid lookups. Do not make a paid call just to be thorough.
+- If a tool result says the payment was blocked because you reached your spending limit, STOP making paid lookups. Clearly tell the caller, in plain language, that you've hit your spending limit and cannot make any more paid lookups on this call. Do not retry the tool.`;
 
 async function main() {
   console.log("🎙️  Setting up Vapi assistant...\n");
+
+  // Step 0: Set the Floe session spend-limit FIRST and FAIL CLOSED. This is the
+  // hard cap the whole demo is about — if we can't set it, abort before creating
+  // any Vapi resources so we never run an uncapped "spend-governed" agent.
+  console.log(`💵 Setting Floe session spend-limit...`);
+  try {
+    const res = await fetch(`${FLOE_CREDIT_API}/v1/agents/spend-limit`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${FLOE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ limitRaw: FLOE_SPEND_LIMIT_RAW }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(`   ❌ Could not set spend-limit (${res.status}): ${body.slice(0, 200)}`);
+      console.error(`      Aborting — refusing to create an uncapped agent. Check FLOE_API_KEY and that the agent is funded, then re-run.`);
+      process.exit(1);
+    }
+    console.log(
+      `   ✅ Spend-limit set: ${FLOE_SPEND_LIMIT_RAW} base units = $${spendCapUsd.toFixed(3)} for this session\n`
+    );
+  } catch (err) {
+    console.error(`   ❌ Spend-limit request failed: ${(err as Error).message}`);
+    console.error(`      Aborting — refusing to create an uncapped agent. Is credit-api reachable? Then re-run.`);
+    process.exit(1);
+  }
 
   // Step 1: Create custom tools
   console.log("📦 Creating tools...");
@@ -111,11 +163,14 @@ async function main() {
 
   console.log(`   ✅ Assistant created: ${assistant.name} (${assistant.id})`);
 
+  console.log(`\n📝 Add this to your .env so the web widget and budget logic can use it:`);
+  console.log(`   VAPI_ASSISTANT_ID=${assistant.id}`);
+
   console.log(`\n📞 Next steps:`);
   console.log(`   1. Start the server:  npx tsx server.ts`);
-  console.log(`   2. In the Vapi dashboard, assign a phone number to assistant ${assistant.id}`);
-  console.log(`   3. Call the number and ask a question!`);
-  console.log(`\n   Or test via the Vapi web widget.`);
+  console.log(`   2. Phone: in the Vapi dashboard, assign a phone number to assistant ${assistant.id}, then call it.`);
+  console.log(`   3. Web:   open http://localhost:${process.env.PORT || "3000"}/ and click "Talk to the agent".`);
+  console.log(`            (the web widget needs VAPI_PUBLIC_KEY + VAPI_ASSISTANT_ID in .env)`);
   console.log(`\n💰 After the call, check your Floe spending:`);
   console.log(
     `   curl -H "Authorization: Bearer $FLOE_API_KEY" \\`

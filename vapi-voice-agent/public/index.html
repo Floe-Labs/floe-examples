@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Floe x Vapi — Budget-Governed Voice Agent</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b0d12;
+        --card: #151922;
+        --fg: #e9edf4;
+        --muted: #93a0b4;
+        --accent: #4f8cff;
+        --danger: #ff5c5c;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid #232a36;
+        border-radius: 16px;
+        padding: 32px;
+        max-width: 460px;
+        width: 100%;
+      }
+      h1 { font-size: 20px; margin: 0 0 4px; }
+      p.sub { color: var(--muted); margin: 0 0 24px; font-size: 14px; line-height: 1.5; }
+      .row { display: flex; gap: 12px; }
+      button {
+        flex: 1;
+        padding: 14px 16px;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      #talk { background: var(--accent); color: #fff; }
+      #stop { background: #232a36; color: var(--fg); }
+      button:disabled { opacity: 0.45; cursor: not-allowed; }
+      #status {
+        margin-top: 20px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        background: #0e1117;
+        border: 1px solid #232a36;
+        font-size: 13px;
+        color: var(--muted);
+        min-height: 20px;
+      }
+      #status.error { color: var(--danger); border-color: var(--danger); }
+      .hint { margin-top: 16px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+      code { background: #0e1117; padding: 1px 5px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Floe &times; Vapi — budget-governed voice agent</h1>
+      <p class="sub">
+        Talk to an agent that pays for live API lookups through Floe. It tapers as it
+        nears its session budget and audibly stops when the cap is reached.
+      </p>
+
+      <div class="row">
+        <button id="talk">🎙️ Talk to the agent</button>
+        <button id="stop" disabled>⏹ Stop</button>
+      </div>
+
+      <div id="status">Loading config…</div>
+
+      <p class="hint">
+        This page uses the Vapi <strong>public</strong> key (safe in the browser) and
+        the assistant id, both served from <code>/config</code>. Your private
+        <code>VAPI_API_KEY</code> and <code>FLOE_API_KEY</code> stay on the server.
+      </p>
+    </div>
+
+    <!--
+      Vapi web SDK, pinned to a verified version. Default export is the `Vapi` class:
+        new Vapi(publicKey)           -> client
+        vapi.start(assistantId)       -> Promise<Call | null>
+        vapi.stop()                   -> Promise<void>
+      esm.sh bundles the SDK's dependencies for direct browser use (no build step).
+    -->
+    <script type="module">
+      import Vapi from "https://esm.sh/@vapi-ai/web@2.5.2";
+
+      const talkBtn = document.getElementById("talk");
+      const stopBtn = document.getElementById("stop");
+      const statusEl = document.getElementById("status");
+
+      function setStatus(text, isError = false) {
+        statusEl.textContent = text;
+        statusEl.classList.toggle("error", isError);
+      }
+
+      let vapi = null;
+      let assistantId = null;
+
+      async function init() {
+        try {
+          const res = await fetch("/config");
+          const cfg = await res.json();
+          assistantId = cfg.assistantId;
+
+          if (!cfg.publicKey || !assistantId) {
+            setStatus(
+              "Missing VAPI_PUBLIC_KEY or VAPI_ASSISTANT_ID on the server. Set them in .env and restart.",
+              true
+            );
+            return;
+          }
+
+          vapi = new Vapi(cfg.publicKey);
+
+          vapi.on("call-start", () => {
+            setStatus("Connected — start talking. Ask about crypto news or a price.");
+            talkBtn.disabled = true;
+            stopBtn.disabled = false;
+          });
+          vapi.on("call-end", () => {
+            setStatus("Call ended.");
+            talkBtn.disabled = false;
+            stopBtn.disabled = true;
+          });
+          vapi.on("speech-start", () => setStatus("Agent is speaking…"));
+          vapi.on("speech-end", () => setStatus("Listening…"));
+          vapi.on("error", (e) => {
+            setStatus("Error: " + (e?.message || JSON.stringify(e)), true);
+            talkBtn.disabled = false;
+            stopBtn.disabled = true;
+          });
+
+          setStatus("Ready. Click “Talk to the agent”.");
+          talkBtn.disabled = false;
+        } catch (err) {
+          setStatus("Failed to load config: " + (err?.message || err), true);
+        }
+      }
+
+      talkBtn.addEventListener("click", async () => {
+        if (!vapi || !assistantId) return;
+        setStatus("Connecting…");
+        talkBtn.disabled = true;
+        try {
+          await vapi.start(assistantId);
+        } catch (err) {
+          setStatus("Could not start call: " + (err?.message || err), true);
+          talkBtn.disabled = false;
+        }
+      });
+
+      stopBtn.addEventListener("click", async () => {
+        if (!vapi) return;
+        try {
+          await vapi.stop();
+        } catch (err) {
+          // Don't leak an unhandled rejection or strand the UI — surface it and
+          // reset controls so the user can recover.
+          setStatus("Could not stop call: " + (err?.message || err), true);
+          stopBtn.disabled = true;
+          talkBtn.disabled = false;
+        }
+      });
+
+      talkBtn.disabled = true;
+      init();
+    </script>
+  </body>
+</html>
