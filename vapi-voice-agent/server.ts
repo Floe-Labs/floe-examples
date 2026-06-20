@@ -21,7 +21,7 @@ const VAPI_SERVER_SECRET = process.env.VAPI_SERVER_SECRET;
 const VAPI_PUBLIC_KEY = process.env.VAPI_PUBLIC_KEY || "";
 const VAPI_ASSISTANT_ID = process.env.VAPI_ASSISTANT_ID || "";
 // Session spend cap, mirrored from setup.ts so the budget line the model reads matches the real cap.
-const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "50000";
+const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "30000";
 const SPEND_CAP_USD = Number(FLOE_SPEND_LIMIT_RAW) / 1e6;
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const FETCH_TIMEOUT_MS = 15_000;
@@ -52,30 +52,15 @@ interface ToolEndpoint {
   buildBody: (args: Record<string, string>) => string;
 }
 
-// All endpoints are listed on the x402 Bazaar (Coinbase CDP facilitator)
-// and settle reliably through Floe's proxy. $0.001–$0.003 per call on Base mainnet.
+// Web search via Exa, paid through Floe's proxy. Exa is x402 v2 / Floe-compatible at
+// ~$0.005 USDC per call. The proxy payload's `body` must be a STRINGIFIED JSON string.
 const TOOL_ENDPOINTS: Record<string, ToolEndpoint> = {
-  get_crypto_news: {
-    buildUrl: () => "https://x402.ottoai.services/crypto-news",
-    method: "GET",
-    requiredArgs: [],
-    buildBody: () => "",
-  },
-  get_market_price: {
-    // Live mark/oracle price, funding rate, OI for any Hyperliquid asset
-    // (BTC, ETH, SOL, etc.). $0.001 per call.
-    buildUrl: (args) =>
-      `https://x402.ottoai.services/hyperliquid-market?asset=${encodeURIComponent(args.asset)}`,
-    method: "GET",
-    requiredArgs: ["asset"],
-    buildBody: () => "",
-  },
-  get_block_number: {
-    // Current Base mainnet block height via eth_blockNumber. $0.001 per call.
-    buildUrl: () => "https://skills.onesource.io/api/chain/block-number",
-    method: "GET",
-    requiredArgs: [],
-    buildBody: () => "",
+  search_web: {
+    buildUrl: () => "https://api.exa.ai/search",
+    method: "POST",
+    requiredArgs: ["query"],
+    buildBody: (args) =>
+      JSON.stringify({ query: args.query, type: "auto", numResults: 5 }),
   },
 };
 
