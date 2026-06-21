@@ -9,11 +9,9 @@
  */
 import "dotenv/config";
 
-// Replace with the IDs printed by `npx tsx setup.ts`.
+// Replace with the ID printed by `npx tsx setup.ts`.
 const TOOL_IDS = [
-  "REPLACE_WITH_get_crypto_news_TOOL_ID",
-  "REPLACE_WITH_get_market_price_TOOL_ID",
-  "REPLACE_WITH_get_block_number_TOOL_ID",
+  "REPLACE_WITH_search_web_TOOL_ID",
 ];
 
 const serverUrl = process.env.SERVER_URL?.replace(/\/+$/, "");

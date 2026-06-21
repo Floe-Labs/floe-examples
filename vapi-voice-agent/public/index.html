@@ -125,7 +125,7 @@
           vapi = new Vapi(cfg.publicKey);
 
           vapi.on("call-start", () => {
-            setStatus("Connected — start talking. Ask about crypto news or a price.");
+            setStatus("Connected — start talking. Ask the concierge anything to look up.");
             talkBtn.disabled = true;
             stopBtn.disabled = false;
           });
