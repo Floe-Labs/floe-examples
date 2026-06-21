@@ -15,6 +15,9 @@ import "dotenv/config";
 const VAPI_API_KEY = process.env.VAPI_API_KEY;
 const SERVER_URL = process.env.SERVER_URL;
 const FLOE_API_KEY = process.env.FLOE_API_KEY;
+// Wired into each tool's server config so Vapi authenticates its webhook calls
+// (sent as the x-vapi-secret header). Without this the server 401s every tool call.
+const VAPI_SERVER_SECRET = process.env.VAPI_SERVER_SECRET;
 // USDC base units (6 decimals): 30000 = $0.03 ≈ 6 Exa searches — low enough to
 // hit the hard-stop in a short demo call.
 const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "30000";
@@ -30,6 +33,10 @@ if (!SERVER_URL) {
 }
 if (!FLOE_API_KEY) {
   console.error("Set FLOE_API_KEY in .env (needed to set the session spend-limit)");
+  process.exit(1);
+}
+if (!VAPI_SERVER_SECRET) {
+  console.error("Set VAPI_SERVER_SECRET in .env (the same value server.ts checks; wired into the tool so Vapi authenticates its webhook calls)");
   process.exit(1);
 }
 
@@ -105,7 +112,7 @@ async function main() {
         required: ["query"],
       },
     },
-    server: { url: toolCallUrl },
+    server: { url: toolCallUrl, headers: { "x-vapi-secret": VAPI_SERVER_SECRET } },
   });
   console.log(`   ✅ search_web (${searchWebTool.id})`);
 
