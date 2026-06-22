@@ -210,21 +210,34 @@ function budgetLine(
   const lookupsLeft = perLookup > 0 ? Math.floor(remainingUsd / perLookup) : 0;
 
   // graduated pace tier — drives both the model's tapering and what it says out loud.
+  // `say` is an explicit spoken directive: models relay a clear in-result "say this"
+  // far more reliably than acting on a system-prompt meta-rule, so this is what makes
+  // the taper actually AUDIBLE across the call.
   let pace: string;
+  let say: string | null;
   if (usedBps >= 9000) {
     pace = "last call — this may be your final lookup";
+    say = "this is the last thing I can look up before my budget's used up for this call";
   } else if (usedBps >= 7500) {
     pace = "nearly out — only search if essential, wrap up soon";
+    say = "I've got budget for about one more lookup, so let's make it count";
   } else if (usedBps >= 5000) {
     pace = "ease up — prefer one focused search, keep answers short";
+    say = "I'll keep this quick — I'm starting to run low on my lookup budget";
   } else {
     pace = "on track";
+    say = null;
   }
 
-  return (
+  const line =
     `\n\n[Floe budget: $${spentDisplay.toFixed(3)} of $${SPEND_CAP_USD.toFixed(3)} used · ` +
-    `$${remainingUsd.toFixed(3)} left · ~${lookupsLeft} lookups left · pace: ${pace}]`
-  );
+    `$${remainingUsd.toFixed(3)} left · ~${lookupsLeft} lookups left · pace: ${pace}]`;
+  // When pacing matters, tell the model to SAY it (naturally, in its own words) before
+  // answering — this is the line the caller actually hears.
+  const directive = say
+    ? `\n[SAY ALOUD to the caller, briefly and naturally, BEFORE your answer: ${say}.]`
+    : "";
+  return line + directive;
 }
 
 // ── Request validation ─────────────────────────────────────────────────
