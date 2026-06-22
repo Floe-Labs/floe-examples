@@ -18,9 +18,9 @@ const FLOE_API_KEY = process.env.FLOE_API_KEY;
 // Wired into each tool's server config so Vapi authenticates its webhook calls
 // (sent as the x-vapi-secret header). Without this the server 401s every tool call.
 const VAPI_SERVER_SECRET = process.env.VAPI_SERVER_SECRET;
-// USDC base units (6 decimals): 30000 = $0.03 ≈ 6 Exa searches — low enough to
-// hit the hard-stop in a short demo call.
-const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "30000";
+// USDC base units (6 decimals): 50000 = $0.05 ≈ 7 Exa searches — wide enough that
+// the budget visibly tapers across several turns before hitting the hard-stop.
+const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "50000";
 const FLOE_CREDIT_API = process.env.FLOE_CREDIT_API_URL || "https://credit-api.floelabs.xyz";
 
 if (!VAPI_API_KEY) {
@@ -44,7 +44,7 @@ if (!VAPI_SERVER_SECRET) {
 // the demo — fail fast with a clear message.
 if (!/^\d+$/.test(FLOE_SPEND_LIMIT_RAW) || Number(FLOE_SPEND_LIMIT_RAW) <= 0) {
   console.error(
-    `FLOE_SPEND_LIMIT_RAW must be a positive integer in USDC base units (e.g. 30000 = $0.03). Got: "${FLOE_SPEND_LIMIT_RAW}"`
+    `FLOE_SPEND_LIMIT_RAW must be a positive integer in USDC base units (e.g. 50000 = $0.05). Got: "${FLOE_SPEND_LIMIT_RAW}"`
   );
   process.exit(1);
 }
@@ -61,9 +61,13 @@ Summarize search results in 2-3 sentences max.
 
 BUDGET — read this carefully:
 - You have a strict, limited spending budget for this call. Each paid lookup (every tool call) costs real money.
-- After each tool call, the result includes a "[Floe budget: ...]" line showing how much of your budget you've used. Read it every time and let it guide you.
-- As you approach your budget, taper off: give shorter answers, batch what the caller wants, and make fewer and only the most necessary paid lookups. Do not make a paid call just to be thorough.
-- If a tool result says the payment was blocked because you reached your spending limit, STOP making paid lookups. Clearly tell the caller, in plain language, that you've hit your spending limit and cannot make any more paid lookups on this call. Do not retry the tool.`;
+- EVERY tool result ends with a "[Floe budget: ...]" line showing dollars used of your cap, dollars left, roughly how many lookups remain, and a "pace:" tier. Read it EVERY time and let it steer you.
+- Pace yourself OUT LOUD as you climb so the caller can HEAR you managing the budget — don't just silently hit a wall at the end:
+  - pace "on track": search normally; no need to mention the budget.
+  - pace "ease up": prefer a single focused search and keep answers short. Briefly say something like "I'll keep this quick to stay on budget."
+  - pace "nearly out": only search if it's essential, and start wrapping up. Say something like "I've got budget for about one more lookup, so let's make it count."
+  - pace "last call": treat your next lookup as possibly your last — say so before you use it.
+- If a tool result says the payment was blocked because you reached your spending limit, STOP making paid lookups. Clearly tell the caller, in plain language, that you've hit your spending limit for this call and cannot make any more paid lookups. Do not retry the tool.`;
 
 async function main() {
   console.log("🎙️  Setting up Vapi assistant...\n");

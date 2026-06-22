@@ -21,7 +21,7 @@ const VAPI_SERVER_SECRET = process.env.VAPI_SERVER_SECRET;
 const VAPI_PUBLIC_KEY = process.env.VAPI_PUBLIC_KEY || "";
 const VAPI_ASSISTANT_ID = process.env.VAPI_ASSISTANT_ID || "";
 // Session spend cap, mirrored from setup.ts so the budget line the model reads matches the real cap.
-const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "30000";
+const FLOE_SPEND_LIMIT_RAW = process.env.FLOE_SPEND_LIMIT_RAW || "50000";
 const SPEND_CAP_USD = Number(FLOE_SPEND_LIMIT_RAW) / 1e6;
 const PORT = parseInt(process.env.PORT || "3000", 10);
 const FETCH_TIMEOUT_MS = 15_000;
@@ -66,12 +66,22 @@ const TOOL_ENDPOINTS: Record<string, ToolEndpoint> = {
 
 // ── Floe proxy helper ──────────────────────────────────────────────────
 
-// Budget advisory header is a JSON string, flag-gated server-side (may be absent).
-// Shape is not guaranteed — read fields defensively.
+// Budget advisory header (X-Floe-Budget-Advisory) is a JSON string, flag-gated
+// server-side (may be absent). Real shape nests the binding constraint under
+// `tightest`, snake_case, with remaining as a USDC base-units string:
+//   {"tightest":{"scope":"session","match":null,"used_bps":0,
+//                "remaining_raw":"30000","window_kind":"session"}}
+// Read fields defensively — every one may be missing.
+interface BudgetAdvisoryScope {
+  scope?: string;
+  match?: string | null;
+  used_bps?: number; // basis points of the limit consumed (0–10000)
+  remaining_raw?: string; // remaining budget in USDC base units (6 decimals), as a string
+  window_kind?: string;
+}
+
 interface BudgetAdvisory {
-  near_limit?: boolean;
-  usedBps?: number;
-  remaining?: string | number;
+  tightest?: BudgetAdvisoryScope;
   [key: string]: unknown;
 }
 
@@ -154,26 +164,67 @@ async function callViaFloe(
   }
 }
 
-// Build the short budget line appended to each successful tool result so the model
-// "sees" its remaining budget and can taper. Prefers the proxy's near-limit advisory
-// signal when present; otherwise derives proximity from cumulative spend vs the cap.
-function budgetLine(spentUsd: number, advisory: BudgetAdvisory | null): string {
-  const used = spentUsd.toFixed(3);
-  const cap = SPEND_CAP_USD.toFixed(3);
+// Sane per-lookup cost when we don't yet know the last call's price (Exa ≈ $0.007).
+const DEFAULT_LOOKUP_COST_USD = 0.007;
 
-  let nearLimit = SPEND_CAP_USD > 0 && spentUsd >= SPEND_CAP_USD * 0.8;
-  if (advisory) {
-    if (typeof advisory.near_limit === "boolean") {
-      nearLimit = advisory.near_limit;
-    } else if (typeof advisory.usedBps === "number") {
-      nearLimit = advisory.usedBps >= 8000; // >= 80%
-    }
+// Build the graduated budget line appended to EVERY successful tool result, so the
+// model reads a continuous spend signal each turn and can taper across the call
+// (not just hit a wall at the end). Prefers the proxy's server-side advisory
+// (`tightest.used_bps` / `tightest.remaining_raw`) when present; otherwise derives
+// everything from cumulative local spend vs the cap. Shows dollars used/cap,
+// dollars left, an approximate lookups-left count, and a graduated pace tier.
+function budgetLine(
+  spentUsd: number,
+  advisory: BudgetAdvisory | null,
+  lastCallCostUsd: number | null
+): string {
+  const tightest = advisory?.tightest;
+  const hasRemaining =
+    !!tightest && typeof tightest.remaining_raw === "string" && tightest.remaining_raw !== "";
+
+  // usedBps: prefer the proxy's server-side signal; else derive from local spend vs cap.
+  let usedBps: number;
+  if (tightest && typeof tightest.used_bps === "number") {
+    usedBps = tightest.used_bps;
+  } else {
+    usedBps = SPEND_CAP_USD > 0 ? Math.round((spentUsd / SPEND_CAP_USD) * 10000) : 0;
   }
 
-  const note = nearLimit
-    ? "approaching limit — keep answers short and make fewer paid lookups"
-    : "on track";
-  return `\n\n[Floe budget: $${used} of $${cap} used — ${note}]`;
+  // remaining: prefer the proxy's remaining_raw (USDC base units string); else cap − local spend.
+  let remainingUsd: number;
+  if (hasRemaining) {
+    const rem = Number(tightest!.remaining_raw) / 1e6;
+    remainingUsd = Number.isFinite(rem) ? Math.max(rem, 0) : Math.max(SPEND_CAP_USD - spentUsd, 0);
+  } else {
+    remainingUsd = Math.max(SPEND_CAP_USD - spentUsd, 0);
+  }
+
+  // spent shown: keep it consistent with remaining when the proxy gave an authoritative
+  // remaining; otherwise fall back to the local cumulative total.
+  const spentDisplay = hasRemaining ? Math.max(SPEND_CAP_USD - remainingUsd, 0) : spentUsd;
+
+  // approximate lookups left: remaining ÷ the most recent paid-call cost (floor),
+  // falling back to a sane per-search estimate when the last cost is unknown.
+  const perLookup =
+    lastCallCostUsd && lastCallCostUsd > 0 ? lastCallCostUsd : DEFAULT_LOOKUP_COST_USD;
+  const lookupsLeft = perLookup > 0 ? Math.floor(remainingUsd / perLookup) : 0;
+
+  // graduated pace tier — drives both the model's tapering and what it says out loud.
+  let pace: string;
+  if (usedBps >= 9000) {
+    pace = "last call — this may be your final lookup";
+  } else if (usedBps >= 7500) {
+    pace = "nearly out — only search if essential, wrap up soon";
+  } else if (usedBps >= 5000) {
+    pace = "ease up — prefer one focused search, keep answers short";
+  } else {
+    pace = "on track";
+  }
+
+  return (
+    `\n\n[Floe budget: $${spentDisplay.toFixed(3)} of $${SPEND_CAP_USD.toFixed(3)} used · ` +
+    `$${remainingUsd.toFixed(3)} left · ~${lookupsLeft} lookups left · pace: ${pace}]`
+  );
 }
 
 // ── Request validation ─────────────────────────────────────────────────
@@ -325,7 +376,7 @@ app.post("/vapi/tool-call", async (request, reply) => {
       // budget line so the model sees how much it has spent and can taper.
       const spent = (spendByCall.get(callId) ?? 0) + (call_.costUsd ?? 0);
       spendByCall.set(callId, spent);
-      const result = call_.text + budgetLine(spent, call_.advisory);
+      const result = call_.text + budgetLine(spent, call_.advisory, call_.costUsd);
 
       console.log(
         `✅ Tool: ${name} (${call.id}) chars=${call_.text.length} ` +
